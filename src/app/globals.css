@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4f7f5;
+  --foreground: #101418;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #0f766e;
+  outline-offset: 2px;
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex h-10 items-center gap-2 rounded-lg bg-[#111827] px-3.5 text-sm font-semibold text-white transition hover:bg-[#0f766e] disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply inline-flex h-10 items-center gap-2 rounded-lg border border-black/10 bg-white px-3.5 text-sm font-semibold text-black/75 transition hover:border-black/25 hover:text-black;
+  }
+
+  .btn-icon {
+    @apply grid size-8 place-items-center rounded-md border border-black/10 bg-white text-black/65 transition hover:border-black/30 hover:text-black;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-black shadow-sm transition placeholder:text-black/35 hover:border-black/20 focus:border-[#0f766e];
+  }
+
+  .label {
+    @apply block text-xs font-semibold uppercase tracking-[0.12em] text-black/50;
+  }
+
+  .tag {
+    @apply inline-flex max-w-full items-center rounded-md bg-black/[0.06] px-2 py-1 text-xs font-medium text-black/60;
+  }
+}
