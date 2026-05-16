@@ -7,10 +7,12 @@ Target: local production server
 Coverage:
 
 - Dashboard loads on desktop and mobile viewports.
+- Supabase public project configuration loads in the production build.
 - Demo auth flow signs into the local workspace.
 - Prompt test bench returns the deterministic demo AI response when no OpenAI key is configured.
 - Shared prompt page renders the public prompt preview.
 - Screenshots were refreshed from a production build.
+- Playwright e2e forces demo mode on its own port so tests do not depend on paid AI quota.
 
 Artifacts:
 
@@ -34,9 +36,8 @@ Result: all checks passed, audit found zero vulnerabilities.
 
 These are intentionally absent from the repository and must be configured in local `.env.local` or deployment secrets:
 
-- `OPENAI_API_KEY`
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- Vercel project/token details
-- GitHub remote/authentication for pushing
+- Supabase URL and public keys are configured locally in ignored `.env.local`.
+- `OPENAI_API_KEY` is configured locally, but the provider returned a quota/billing 429 during live route validation.
+- Supabase migrations still require privileged database credentials, a Supabase access token, or a dashboard SQL run; public anon/publishable keys cannot apply schema changes.
+- Vercel team ID is configured locally, but no Vercel token or linked project is present.
+- GitHub remote is configured; push still depends on local GitHub authentication.

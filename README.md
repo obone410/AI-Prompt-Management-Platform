@@ -96,7 +96,7 @@ The test bench calls:
 POST /api/test-prompt
 ```
 
-The route validates input with Zod, rate-limits local requests, keeps `OPENAI_API_KEY` server-only, and uses the OpenAI Responses API when credentials exist.
+The route validates input with Zod, rate-limits local requests, keeps `OPENAI_API_KEY` server-only, and uses the OpenAI Responses API when credentials exist. It omits temperature automatically for models that do not support that parameter.
 
 If no OpenAI key is configured, the route returns a deterministic demo response so the project can still be reviewed locally.
 
@@ -165,10 +165,10 @@ Local browser QA was performed with Playwright against a production build. Refre
 
 The repository is committed locally and ready to push once a GitHub remote is added. Missing external credentials in this environment:
 
-- No `OPENAI_API_KEY`
-- No Supabase project URL or publishable key
-- No Vercel token/project link
-- No GitHub remote or authenticated GitHub CLI
+- Supabase URL and public keys are configured in ignored `.env.local`.
+- `OPENAI_API_KEY` is configured in ignored `.env.local`, but live validation returned a provider quota/billing error.
+- Vercel team ID is configured in ignored `.env.local`; Vercel token/project link is still missing.
+- GitHub remote is configured; pushing depends on local GitHub authentication.
 
 ## Designing For 1 Million Users
 

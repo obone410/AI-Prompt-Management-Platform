@@ -41,6 +41,10 @@ function demoResponse(prompt: string, input: string) {
   return `Demo response: I would execute the saved prompt by focusing on "${promptFocus}". With live OpenAI credentials configured, this panel returns the real model output, latency, and provider metadata.`;
 }
 
+function supportsTemperature(model: string) {
+  return !/^(gpt-5|o\d|o[134]|gpt-oss)/i.test(model);
+}
+
 export async function POST(request: NextRequest) {
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
@@ -78,14 +82,18 @@ export async function POST(request: NextRequest) {
 
   try {
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const response = await client.responses.create({
+    const request = {
       model,
       instructions:
         "You are testing a saved prompt in a prompt management platform. Follow the saved prompt exactly and return the result only.",
       input: prompt.replace(/\{\{input\}\}/g, input || ""),
       max_output_tokens: 900,
-      temperature: temperature ?? 0.4,
       store: false,
+      ...(supportsTemperature(model) ? { temperature: temperature ?? 0.4 } : {}),
+    };
+
+    const response = await client.responses.create({
+      ...request,
     });
 
     return NextResponse.json({
