@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { hasSupabaseSession, requiresLiveProviderSession } from "@/lib/api-auth";
 import { apiError, normalizeApiError } from "@/lib/api-errors";
-import { modelCatalog } from "@/lib/ai/providers";
+import { modelCatalog } from "@/lib/ai/catalog";
 import { enqueueEvaluationJob } from "@/lib/background-jobs";
 import { captureServerError, captureServerEvent } from "@/lib/observability";
 import { checkRateLimit } from "@/lib/rate-limit";

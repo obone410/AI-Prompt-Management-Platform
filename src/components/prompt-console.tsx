@@ -54,7 +54,11 @@ import clsx from "clsx";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { publicConfig } from "@/lib/config";
-import { modelCatalog, type EvaluationResult, type PromptOptimizationResult } from "@/lib/ai/providers";
+import {
+  modelCatalog,
+  type EvaluationResult,
+  type PromptOptimizationResult,
+} from "@/lib/ai/catalog";
 import { buildPromptDiff } from "@/lib/prompt-diff";
 import {
   extractPromptVariables,
