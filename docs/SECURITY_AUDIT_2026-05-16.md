@@ -2,7 +2,7 @@
 
 Target: `https://ai-prompt-management-platform.vercel.app`
 
-The production alias was checked after the hardened Vercel deployment completed.
+The production alias was checked after the hardened Vercel deployment completed, then refreshed after the v2.0 AI Workflow Operating System deployment.
 
 ## Scope
 
@@ -29,7 +29,7 @@ No high or critical exploitable vulnerability survived validation after these fi
 
 ## Secret Exposure Check
 
-Deployed HTML and 8 generated Next.js JavaScript assets were scanned for secret-shaped values:
+Deployed HTML and 9 generated Next.js JavaScript assets were scanned for secret-shaped values:
 
 - No OpenAI secret key values found.
 - No Vercel token found.
@@ -60,16 +60,18 @@ Browser QA:
 
 - Homepage status: `200`
 - Share route status: `200`
+- Production title: `PromptDeck AI v2.0 — AI Workflow Operating System`
+- Version marker visible: `AI Workflow OS v2.0.0`
 - Console errors: `0`
 - Failed requests: `0`
 - 4xx/5xx page asset responses: `0`
 
 Performance spot check:
 
-| Route | DOMContentLoaded | Load | LCP | Transferred |
+| Route | DOMContentLoaded | Load | FCP | Transferred |
 | --- | ---: | ---: | ---: | ---: |
-| `/` | 563 ms | 758 ms | 1208 ms | 286 KB |
-| `/share/product-brief` | 1053 ms | 1126 ms | 1072 ms | 216 KB |
+| `/` | 501 ms | 638 ms | 572 ms | 447 KB |
+| `/share/product-brief` | 1183 ms | 1279 ms | 1276 ms | 220 KB |
 
 Screenshot artifact:
 

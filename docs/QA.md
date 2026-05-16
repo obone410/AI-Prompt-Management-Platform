@@ -42,6 +42,8 @@ Result:
 
 - Homepage returned `200`.
 - Share route returned `200`.
+- Production title returned `PromptDeck AI v2.0 — AI Workflow Operating System`.
+- Version marker `AI Workflow OS v2.0.0` rendered in the live UI.
 - Browser console errors: `0`.
 - Failed network requests: `0`.
 - Unexpected 4xx/5xx page asset responses: `0`.
@@ -49,10 +51,10 @@ Result:
 
 Performance spot check:
 
-| Route | DOMContentLoaded | Load | LCP | Transferred |
+| Route | DOMContentLoaded | Load | FCP | Transferred |
 | --- | ---: | ---: | ---: | ---: |
-| `/` | 563 ms | 758 ms | 1208 ms | 286 KB |
-| `/share/product-brief` | 1053 ms | 1126 ms | 1072 ms | 216 KB |
+| `/` | 501 ms | 638 ms | 572 ms | 447 KB |
+| `/share/product-brief` | 1183 ms | 1279 ms | 1276 ms | 220 KB |
 
 ## Command Verification
 
@@ -82,7 +84,7 @@ Latest production scan:
 
 Summary:
 
-- Deployed HTML and 8 generated JavaScript assets were scanned.
+- Deployed HTML and 9 generated JavaScript assets were scanned.
 - No OpenAI, Vercel, or Supabase service-role secrets were found in deployed assets.
 - The only deployed key-like values found were the expected public Supabase URL and publishable key.
 - Security headers are present on production responses.
