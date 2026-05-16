@@ -1,6 +1,6 @@
 # Security Notes
 
-PromptDeck AI is designed so public keys can be committed only through `.env.example`, while real credentials stay in `.env.local`, Vercel project secrets, or Supabase project settings.
+PromptDeck OS is designed so public keys can be committed only through `.env.example`, while real credentials stay in `.env.local`, Vercel project secrets, or Supabase project settings.
 
 ## Implemented Checks
 
@@ -8,13 +8,15 @@ PromptDeck AI is designed so public keys can be committed only through `.env.exa
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` is supported only as a compatibility fallback for older Supabase dashboards.
 - OpenAI credentials are server-only through `OPENAI_API_KEY`.
 - `.gitignore` excludes `.env*` and explicitly allows only `.env.example`.
-- AI test requests validate payload size with Zod before calling the provider.
-- The AI test route has a per-IP in-memory limiter for local/dev safety.
-- Live OpenAI tests require a Supabase session when Supabase and OpenAI are both configured.
+- AI test, evaluation, and optimization requests validate payload size with Zod before calling provider adapters.
+- API routes use Upstash Redis rate limiting when configured and a local fallback for development.
+- Live OpenAI tests/evaluations/optimizations require a Supabase session when Supabase and OpenAI are both configured.
 - Explicit demo-mode tests return a deterministic response without calling OpenAI.
+- Claude and Gemini are represented through server-side adapter contracts; no browser-side provider keys are used.
+- Observability hooks keep Sentry/PostHog-style event capture server-side.
 - Production responses set CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, and COOP headers.
 - Supabase migration enables Row Level Security on all user data tables.
-- RLS policies restrict private prompts, categories, profiles, and prompt runs to the owning user.
+- RLS policies restrict private prompts, categories, profiles, prompt runs, versions, evaluations, activity, workspace members, and invites.
 - Public prompt sharing is exposed through `get_public_prompt_by_slug`, which returns one prompt by slug only when `is_public = true`.
 - Search, category, favorite, share, and run-history indexes are included for large datasets.
 
@@ -26,18 +28,23 @@ PromptDeck AI is designed so public keys can be committed only through `.env.exa
 | `prompt_categories` | Users can create, read, update, and delete only their own categories. |
 | `prompts` | Users can create, read, update, and delete only their own prompts. |
 | `prompt_runs` | Users can read and delete only their own runs; inserts must reference one of their prompts. |
+| `prompt_versions` | Owners and workspace members can read; owner writes and trigger snapshots preserve history. |
+| `prompt_evaluations` | Owners and workspace members can read; owner writes benchmark results. |
+| `workspaces` | Owners and members can read; owner manages. |
+| `workspace_members` | Workspace members can read; owner manages. |
 | `get_public_prompt_by_slug` | Anonymous and authenticated clients can fetch one public prompt by exact share slug. |
 
 ## Production Hardening
 
 - Use Supabase publishable keys in the browser and keep secret keys server-only.
 - Never add `SUPABASE_SERVICE_ROLE_KEY` to `NEXT_PUBLIC_*` variables or client bundles.
-- Replace the local route limiter with a durable distributed limiter such as Upstash or a Vercel KV-backed token bucket.
+- Configure `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in production for distributed rate limits.
 - Set Vercel environment variables per environment and never expose `OPENAI_API_KEY` to the client.
+- Keep `POSTHOG_PROJECT_API_KEY`, `SENTRY_DSN`, and Upstash tokens server-side.
 - Configure Preview environment variables before using Vercel preview deployments.
 - Configure Supabase Auth email redirect URLs for local preview, Vercel preview, and production.
 - Turn on Supabase leaked password protection and MFA for admin accounts.
-- Add monitoring for `/api/test-prompt` latency, 429s, provider errors, and token spend.
+- Add monitoring for `/api/test-prompt`, `/api/evaluate-prompt`, and `/api/optimize-prompt` latency, 429s, provider errors, and token spend.
 - For already large production tables, create new indexes concurrently in separate migrations.
 
 ## Latest Audit

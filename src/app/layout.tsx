@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PromptDeck AI",
+  title: "PromptDeck OS",
   description:
-    "A recruiter-ready AI prompt management platform with testing, sharing, exports, and Supabase-ready security.",
+    "A production-minded PromptOps workflow operating system with versioning, evaluations, analytics, sharing, and Supabase-ready security.",
 };
 
 export default function RootLayout({

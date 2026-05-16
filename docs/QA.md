@@ -12,8 +12,12 @@ Coverage:
 - Prompt test bench returns the deterministic demo AI response when no OpenAI key is configured.
 - Demo access returns a local demo session and deterministic demo AI response even when Supabase/OpenAI env vars are configured.
 - Demo access was checked for accidental Supabase signup calls; observed signup requests: `0`.
+- AI-assisted prompt optimization renders suggestions in demo mode.
+- Side-by-side model evaluation renders GPT and Claude adapter cards in demo mode.
+- Analytics and Team tabs render from the production build.
 - Shared prompt page renders the public prompt preview.
 - Screenshots were refreshed from a production build.
+- Animated demo GIF was generated from real browser frames.
 - Playwright e2e forces demo mode on its own port so tests do not depend on paid AI quota.
 
 Artifacts:
@@ -22,6 +26,7 @@ Artifacts:
 - `docs/screenshots/dashboard-mobile.png`
 - `docs/screenshots/shared-prompt.png`
 - `docs/screenshots/live-production-security.png`
+- `docs/demos/promptops-demo.gif`
 
 ## Production Browser QA
 
@@ -55,6 +60,14 @@ npm audit --audit-level=moderate
 
 Result: all checks passed, audit found zero vulnerabilities.
 
+Additional production-build browser check:
+
+```text
+consoleErrorCount=0
+failedRequestCount=0
+signupRequestCount=0
+```
+
 ## Security Audit
 
 Latest production scan:
@@ -74,6 +87,7 @@ These are intentionally absent from the repository and must be configured in loc
 
 - Supabase URL and public keys are configured locally in ignored `.env.local`.
 - `OPENAI_API_KEY` is configured in Vercel Production and Development environments, but values are encrypted/write-only.
+- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `SENTRY_DSN`, and `POSTHOG_PROJECT_API_KEY` are optional production integrations and are not committed.
 - Vercel Production and Development env vars are configured; Preview env vars were not present in the CLI listing and should be added before preview deployments are used.
 - Supabase migrations require privileged database credentials, a Supabase access token, or a dashboard SQL run; public anon/publishable keys cannot apply schema changes.
 - GitHub remote is configured; pushing depends on local GitHub authentication.

@@ -1,6 +1,6 @@
 # Supabase Setup
 
-PromptDeck AI includes production-ready Supabase schema and RLS migrations in `supabase/migrations`.
+PromptDeck OS includes Supabase schema, indexes, triggers, RPCs, and RLS policies in `supabase/migrations`.
 
 ## Migration Order
 
@@ -8,24 +8,41 @@ Apply migrations in filename order:
 
 1. `202605150001_initial_promptdeck_schema.sql`
 2. `202605160001_harden_public_prompt_sharing.sql`
+3. `202605160002_promptops_operating_system.sql`
 
-The first migration creates the app tables, indexes, triggers, generated search vector, and owner-based policies. The second migration tightens public prompt sharing so anonymous users cannot list all public prompts directly from `prompts`; shared prompts are fetched through the slug-scoped `get_public_prompt_by_slug` RPC.
+The first migration creates the original prompt workspace. The second tightens public sharing so anonymous users cannot list all public prompts from `prompts`. The third adds PromptOps production foundations: workspaces, members, collections, versions, evaluations, activity, invites, Redis-ready API architecture support, and automatic version snapshots.
 
 ## Tables
 
 - `profiles`: one row per Supabase Auth user
 - `prompt_categories`: user-owned prompt groups
 - `prompts`: prompt content, model settings, search vector, favorite state, and share slug
-- `prompt_runs`: AI test history for prompt runs
+- `prompt_runs`: single prompt test history
+- `prompt_versions`: historical prompt snapshots with changelog notes
+- `prompt_evaluations`: side-by-side model benchmark results
+- `prompt_activity`: workspace activity timeline events
+- `workspaces`: ownership boundary for teams
+- `workspace_members`: team role assignments
+- `workspace_invites`: invite UI persistence target
+- `prompt_collections`: shared prompt sets
+- `collection_prompts`: prompt-to-collection join table
 
 ## RLS Policy Matrix
 
-| Table | Select | Insert | Update | Delete |
-| --- | --- | --- | --- | --- |
-| `profiles` | Owner only | Auth trigger | Owner only | Cascade through auth user deletion |
-| `prompt_categories` | Owner only | Owner only | Owner only | Owner only |
-| `prompts` | Owner only | Owner only | Owner only | Owner only |
-| `prompt_runs` | Owner only | Owner only, prompt must belong to owner | Not exposed | Owner only |
+| Table | Access Model |
+| --- | --- |
+| `profiles` | Users can read/update only their own profile. |
+| `prompt_categories` | Owner-only CRUD. |
+| `prompts` | Owner-only CRUD; public reads happen only through slug RPC. |
+| `prompt_runs` | Owner-only read/insert/delete. |
+| `prompt_versions` | Owner or workspace member read; owner insert; automatic trigger snapshots on prompt edits. |
+| `prompt_evaluations` | Owner or workspace member read; owner insert. |
+| `prompt_activity` | Owner or workspace member read; owner insert. |
+| `workspaces` | Owner/member read; owner write. |
+| `workspace_members` | Workspace members can read; owner manages. |
+| `workspace_invites` | Workspace members can read; owner manages. |
+| `prompt_collections` | Owner/private, workspace, or public visibility. |
+| `collection_prompts` | Read/write through collection ownership and visibility. |
 
 Public prompt reads use:
 
@@ -33,7 +50,20 @@ Public prompt reads use:
 select * from public.get_public_prompt_by_slug('product-brief');
 ```
 
-That function returns one shared prompt by slug and only when `is_public = true`.
+That function returns one shared prompt by exact slug and only when `is_public = true`.
+
+## Versioning Trigger
+
+`capture_prompt_version_before_update` automatically writes the previous prompt state into `prompt_versions` before important prompt fields change:
+
+- title
+- description
+- content
+- tags
+- model
+- temperature
+
+The app also keeps local demo-mode versions with user-facing changelog notes and rollback support.
 
 ## Indexing And Scale
 
@@ -44,8 +74,12 @@ That function returns one shared prompt by slug and only when `is_public = true`
 - Tag filters: `prompts_tags_idx`
 - Full-text search: `prompts_search_document_idx`
 - Run history: `prompt_runs_prompt_created_idx`, `prompt_runs_user_created_idx`
+- Versions: `prompt_versions_prompt_idx`
+- Evaluations: `prompt_evaluations_prompt_idx`, `prompt_evaluations_user_idx`
+- Workspaces: `workspaces_owner_idx`, `workspace_members_user_idx`
+- Activity: `prompt_activity_workspace_idx`
 
-For production tables that already contain large data volumes, add new indexes in later migrations with `CREATE INDEX CONCURRENTLY` outside a transaction.
+For production tables that already contain large data volumes, create new indexes concurrently in separate migrations outside a transaction.
 
 ## Environment Variables
 
@@ -57,6 +91,11 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+SENTRY_DSN=
+POSTHOG_PROJECT_API_KEY=
+POSTHOG_HOST=https://app.posthog.com
 ```
 
-Only `NEXT_PUBLIC_*` values are allowed in the browser. Keep OpenAI keys and any Supabase service-role keys out of client code.
+Only `NEXT_PUBLIC_*` values are allowed in the browser. Keep OpenAI keys, Upstash tokens, PostHog project keys, and Supabase service-role keys out of client code.

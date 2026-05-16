@@ -1,40 +1,42 @@
-# PromptDeck AI
+# PromptDeck OS
 
-A recruiter-ready AI Prompt Management Platform for saving, categorizing, testing, sharing, favoriting, searching, and exporting reusable prompts.
+A production-minded PromptOps workflow operating system for managing, versioning, testing, optimizing, sharing, and evaluating reusable AI prompts.
 
-PromptDeck AI is built as a real working console, not a landing page. It runs locally without external keys through demo mode, and it persists categories, prompts, and test runs to Supabase when production credentials are configured.
+PromptDeck OS is built as the actual SaaS console, not a marketing landing page. It runs in local demo mode without paid provider access, and it can persist prompts, versions, evaluations, categories, runs, and collaboration foundations to Supabase when production credentials and migrations are configured.
+
+## Demo
+
+![PromptDeck OS animated demo](docs/demos/promptops-demo.gif)
 
 ## Screenshots
 
-### Dashboard
+### PromptOps Console
 
-![PromptDeck AI desktop dashboard](docs/screenshots/dashboard-desktop.png)
+![PromptDeck OS desktop dashboard](docs/screenshots/dashboard-desktop.png)
 
 ### Mobile
 
-![PromptDeck AI mobile dashboard](docs/screenshots/dashboard-mobile.png)
+![PromptDeck OS mobile dashboard](docs/screenshots/dashboard-mobile.png)
 
 ### Shared Prompt
 
-![PromptDeck AI shared prompt page](docs/screenshots/shared-prompt.png)
+![PromptDeck OS shared prompt page](docs/screenshots/shared-prompt.png)
 
-## Features
+## Production Features
 
-- Authentication-ready account flow with Supabase support and local demo mode
-- Explicit demo access that never creates a Supabase account by accident
-- Prompt CRUD for creating, editing, duplicating, deleting, and organizing prompts
-- Supabase-backed prompt/category/run persistence when configured
-- Prompt categories with color-coded library filters
-- Search across titles, descriptions, bodies, and tags
-- Favorite prompts and shared prompt filters
-- Public share links for prompts marked as shared
-- AI test bench with prompt input, model settings, latency metadata, and run history
-- Export filtered prompts to JSON or Markdown
-- Responsive dashboard UI for desktop and mobile
-- Supabase SQL migration with indexes, triggers, constraints, and RLS policies
-- Slug-scoped public prompt RPC for safer sharing
-- Production security headers and authenticated live AI testing
-- Playwright e2e coverage for the core demo workflow
+- PromptOps command center with CRUD, search, filters, favorites, sharing, export, and Cmd+K actions
+- Full prompt versioning foundations with `prompt_versions`, automatic Supabase edit snapshots, local version notes, rollback, and git-style diffs
+- Dynamic `{{variable}}` detection, generated input forms, validation, and live rendered prompt preview
+- AI-assisted prompt optimization with structure, clarity, variable, and hallucination-risk suggestions
+- Side-by-side model evaluation across GPT, Claude, and Gemini adapter abstractions
+- Evaluation cards with output, metrics, notes, latency, token estimates, output length, and heuristic quality score
+- Analytics dashboard with usage frequency, category usage, average latency, favorite prompt charts, and recent activity
+- Workspace, shared collection, team role, ownership, and mock invite foundations
+- Server-only provider calls, Zod validation, protected live AI routes, RLS-first schema, and secure env handling
+- Upstash Redis rate-limit integration with a local development fallback
+- Observability hook layer for PostHog/Sentry-style server events
+- Background job abstraction for future async evaluation queues
+- Optimistic UI updates, pagination/load-more prompt browsing, and responsive SaaS UX
 
 ## Tech Stack
 
@@ -44,63 +46,80 @@ PromptDeck AI is built as a real working console, not a landing page. It runs lo
 - Supabase SSR helpers `0.10.3`
 - Supabase JS `2.105.4`
 - OpenAI Node SDK `6.38.0`
+- Recharts
+- Framer Motion
+- Upstash Redis
 - Zod `4.4.3`
-- Lucide React icons
-- Playwright for local browser verification
-- Vercel-ready deployment configuration
+- TypeScript
+- Playwright
+- Vercel
 
-## Prompt Engineering Workflow
+## PromptOps Lifecycle
 
-PromptDeck models prompts as reusable workflow assets. Each prompt stores:
+```mermaid
+flowchart LR
+  Capture["Capture prompt idea"] --> Structure["Add variables and output contract"]
+  Structure --> Version["Save version and changelog"]
+  Version --> Evaluate["Evaluate across model adapters"]
+  Evaluate --> Optimize["AI-assisted optimization"]
+  Optimize --> Share["Share collection or public slug"]
+  Share --> Observe["Track usage, latency, score, activity"]
+  Observe --> Version
+```
 
-- The actual prompt body, including `{{input}}` placeholders
-- Category and tags for retrieval
-- Model and temperature settings
-- Favorite and sharing state
-- Usage count and last tested timestamp
-- Test run history with model, provider, output, and latency
+## Architecture
 
-This makes the app useful for AI-heavy teams that need repeatable prompt operations instead of scattered notes.
+```mermaid
+flowchart TD
+  UI["Next.js App Router UI"] --> Local["Local demo workspace"]
+  UI --> API["Protected API routes"]
+  UI --> SupabaseClient["Supabase browser client"]
+  API --> RateLimit["Upstash Redis rate limiter"]
+  API --> Providers["AI provider adapter layer"]
+  Providers --> OpenAI["OpenAI Responses API"]
+  Providers --> Claude["Claude adapter"]
+  Providers --> Gemini["Gemini adapter"]
+  API --> Observability["Observability hooks"]
+  SupabaseClient --> RLS["Supabase Postgres + RLS"]
+  RLS --> Versions["prompt_versions"]
+  RLS --> Evaluations["prompt_evaluations"]
+  RLS --> Workspaces["workspaces and collections"]
+```
+
+More diagrams live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Database Schema
 
-The Supabase migration lives in:
+Migration files live in `supabase/migrations/` and should be applied in filename order.
 
-```text
-supabase/migrations/
-```
+Core tables:
 
-Tables:
+- `profiles`
+- `prompt_categories`
+- `prompts`
+- `prompt_runs`
+- `prompt_versions`
+- `prompt_evaluations`
+- `prompt_activity`
+- `workspaces`
+- `workspace_members`
+- `workspace_invites`
+- `prompt_collections`
+- `collection_prompts`
 
-- `profiles`: user profile attached to Supabase Auth
-- `prompt_categories`: user-owned prompt categories
-- `prompts`: prompt content, tags, favorite/share state, model settings, and search vector
-- `prompt_runs`: AI test history for each prompt
+Scale-oriented indexes cover user dashboards, categories, favorites, tags, full-text search, public share slugs, prompt versions, evaluations, activity timelines, and workspace membership.
 
-Scale-oriented indexes include:
+See [docs/SUPABASE.md](docs/SUPABASE.md) for the RLS policy matrix and migration order.
 
-- `prompts_user_updated_idx`
-- `prompts_user_category_idx`
-- `prompts_user_favorite_idx`
-- `prompts_public_share_slug_idx`
-- `prompts_tags_idx`
-- `prompts_search_document_idx`
-- `prompt_runs_user_created_idx`
-
-Row Level Security is enabled on every user data table.
-See `docs/SUPABASE.md` for the policy matrix, migration order, and public sharing RPC.
-
-## AI Testing Logic
-
-The test bench calls:
+## API Routes
 
 ```text
 POST /api/test-prompt
+POST /api/evaluate-prompt
+POST /api/optimize-prompt
 ```
 
-The route validates input with Zod, rate-limits local requests, keeps `OPENAI_API_KEY` server-only, and uses the OpenAI Responses API when credentials exist. When Supabase and OpenAI are configured together, live provider tests require a Supabase session so anonymous traffic cannot spend provider quota. Explicit demo sessions return a deterministic demo response without calling OpenAI. The route also omits temperature automatically for models that do not support that parameter.
-
-If no OpenAI key is configured, the route returns a deterministic demo response so the project can still be reviewed locally.
+All routes validate payloads with Zod. Live provider calls require a Supabase session when Supabase and provider credentials are configured. Explicit demo mode returns deterministic demo responses without provider spend.
 
 ## Local Setup
 
@@ -123,9 +142,14 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+SENTRY_DSN=
+POSTHOG_PROJECT_API_KEY=
+POSTHOG_HOST=https://app.posthog.com
 ```
 
-Use `.env.example` as the template. `NEXT_PUBLIC_SUPABASE_ANON_KEY` is only a compatibility fallback for older Supabase dashboards; new projects should use `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Real `.env*` files are ignored by Git.
+Use `.env.example` as the template. Real `.env*` files are ignored by Git.
 
 ## Verification
 
@@ -139,67 +163,52 @@ npm run test:e2e
 npm audit --audit-level=moderate
 ```
 
-Current security audit result:
+Current audit result:
 
 ```text
 found 0 vulnerabilities
 ```
 
-The project also includes `SECURITY.md` with implemented checks and production hardening notes.
+Browser QA covers the demo auth path, prompt optimization, side-by-side evaluation, analytics tab, team tab, and shared prompt route.
 
-Local browser QA was performed with Playwright against a production build. Refreshed screenshots are stored in `docs/screenshots/`.
-
-The latest production security pass is documented in:
-
-```text
-docs/SECURITY_AUDIT_2026-05-16.md
-```
-
-It confirmed security headers are present, deployed assets do not expose OpenAI/Vercel/Supabase service-role secrets, and the live AI test API returns `401` for unauthenticated provider-spend attempts.
-
-## Deployment Process
+## Deployment
 
 1. Create a Supabase project.
-2. Apply all SQL files in `supabase/migrations/` in filename order.
+2. Apply all SQL migrations in filename order.
 3. Configure Supabase Auth redirect URLs for local, preview, and production.
-4. Create a Vercel project from this repository.
-5. Add environment variables in Vercel:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` if your Supabase dashboard only exposes an anon key
-   - `OPENAI_API_KEY`
-   - `OPENAI_MODEL`
+4. Create or link the Vercel project.
+5. Add Production, Preview, and Development env vars in Vercel.
 6. Deploy with Vercel.
 
-## GitHub And Vercel Readiness
+Production URL:
 
-- GitHub remote: `https://github.com/obone410/AI-Prompt-Management-Platform.git`
-- Production URL: `https://ai-prompt-management-platform.vercel.app`
-- Vercel Production and Development environment variables are configured with encrypted values.
-- Vercel Preview environment variables should be added before preview deployments are used.
+```text
+https://ai-prompt-management-platform.vercel.app
+```
 
-Missing external credentials are intentionally not stored in the repository:
+GitHub remote:
 
-- Supabase URL and public keys live in ignored `.env.local` and encrypted Vercel env vars.
-- `OPENAI_API_KEY` lives in ignored `.env.local` and encrypted Vercel env vars.
-- Supabase migrations require privileged project access or a dashboard SQL run; public browser keys cannot apply schema changes.
+```text
+https://github.com/obone410/AI-Prompt-Management-Platform.git
+```
 
-## Designing For 1 Million Users
+## Scaling To 1 Million Users
 
-The current implementation is designed so the next production steps are straightforward:
-
-- Every database query can be scoped by `user_id`.
-- Search is backed by a generated `tsvector` and GIN index.
+- Queries stay scoped by `user_id` and/or workspace membership.
+- Prompt search uses generated `tsvector` plus GIN index.
 - Tags use a GIN index.
-- Public sharing uses a partial unique index.
-- Prompt runs are append-only and indexed by prompt and user.
-- AI calls happen server-side for central cost control and rate limiting.
-- Cursor pagination can be added before exposing very large workspaces.
-- A durable rate limiter should replace the local in-memory limiter for production.
+- Public sharing uses a partial unique index and slug-scoped RPC.
+- Version history and evaluations are append-oriented and indexed by prompt/user.
+- AI calls stay server-side for spend control, auth, rate limiting, and observability.
+- Upstash Redis can enforce distributed rate limits across Vercel regions.
+- The UI has a load-more pagination path and can move to cursor pagination for very large workspaces.
+- Evaluation work uses an inline job abstraction today and can be moved to a queue without changing UI contracts.
 
-## Lessons Learned
+## Recruiter Signals
 
-- Prompt management works best when prompts are treated like operational assets: categorized, tested, version-aware, and exportable.
-- A local demo mode makes recruiter review much easier without weakening the production Supabase/OpenAI integration points.
-- Security posture matters even in portfolio projects: hidden secrets, server-only AI calls, RLS, validation, and audit checks all make the project more credible.
-- Responsive dashboard design needs dense, scannable UI more than a marketing-style hero page.
+- Prompt engineering workflow and PromptOps terminology
+- CRUD, versioning, rollback, diffing, and audit history
+- AI provider abstraction and benchmark/evaluation concepts
+- Database schema design with RLS and indexes
+- Secure server-side AI calls and environment handling
+- Analytics, collaboration foundations, and production scaling story

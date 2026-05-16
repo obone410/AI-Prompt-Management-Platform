@@ -1,36 +1,109 @@
-# PromptDeck AI Architecture
+# PromptDeck OS Architecture
+
+PromptDeck OS positions prompt management as AI workflow infrastructure: teams capture prompts, manage variables, version changes, run evaluations, optimize prompt quality, share collections, and observe usage.
 
 ## Product Surface
 
-PromptDeck AI is a prompt management workspace for saving, categorizing, testing, sharing, favoriting, searching, and exporting reusable prompts. The first screen is the working console so recruiters can immediately test CRUD and AI workflow behavior.
+- PromptOps console: CRUD, search, favorites, sharing, export, variables, and versioning
+- AI Lab: test prompts, compare model adapters, inspect metrics, and optimize prompts
+- Analytics: category usage, frequency, latency, favorites, and activity timelines
+- Team foundations: workspaces, members, roles, invites, and shared collections
 
-## Stack
+## Runtime Architecture
 
-- Next.js 16 App Router with React 19
-- Tailwind CSS 4
-- Supabase Auth and Postgres with RLS-ready migrations
-- OpenAI Responses API through a server-only route
-- Vercel-ready environment variables
+```mermaid
+flowchart TD
+  Browser["React 19 PromptOps UI"] --> LocalStore["Local demo workspace"]
+  Browser --> SupabaseBrowser["Supabase browser client"]
+  Browser --> Routes["Next.js API routes"]
 
-## Data Model
+  Routes --> Auth["Supabase session check"]
+  Routes --> Zod["Zod payload validation"]
+  Routes --> RateLimit["Upstash Redis rate limiter"]
+  Routes --> Jobs["Evaluation job abstraction"]
+  Routes --> Observability["PostHog/Sentry-style hooks"]
+  Jobs --> Providers["Provider adapter layer"]
+  Providers --> OpenAI["OpenAI SDK"]
+  Providers --> Claude["Claude adapter contract"]
+  Providers --> Gemini["Gemini adapter contract"]
 
-- `profiles`: one profile per Supabase auth user
-- `prompt_categories`: user-owned categories with color and description
-- `prompts`: user-owned prompt records with tags, sharing, favorite state, search vector, and AI settings
-- `prompt_runs`: test history with provider, latency, model, input, and output
+  SupabaseBrowser --> Postgres["Supabase Postgres"]
+  Postgres --> RLS["Row Level Security"]
+```
 
-Detailed Supabase setup and RLS notes live in `docs/SUPABASE.md`.
+## PromptOps Lifecycle
 
-## Scale Notes For 1 Million Users
+```mermaid
+sequenceDiagram
+  participant User
+  participant UI as PromptDeck OS
+  participant API as Next API
+  participant AI as Provider Adapter
+  participant DB as Supabase
 
-- User-scoped composite indexes keep dashboard queries bounded by `user_id`.
-- Full-text search uses a generated `tsvector` with a GIN index instead of scanning prompt bodies.
-- Tags use a GIN index for filter performance.
-- Public sharing uses a partial unique index on `share_slug`.
-- Prompt runs are append-only and indexed by user and prompt for recent-history reads.
-- The app is ready for cursor pagination once workspaces grow beyond the first page of prompts.
-- AI test calls stay on the server so provider keys and future rate limits are centralized.
+  User->>UI: Create or edit prompt
+  UI->>UI: Detect variables and render preview
+  UI->>DB: Persist prompt through RLS
+  DB->>DB: Trigger prompt_versions snapshot on update
+  User->>UI: Run side-by-side evaluation
+  UI->>API: POST /api/evaluate-prompt
+  API->>API: Validate, rate-limit, check session
+  API->>AI: Run selected model adapters
+  AI-->>API: Outputs and metrics
+  API-->>UI: Evaluation cards
+  UI->>DB: Persist evaluation history when signed in
+```
 
-## Local Mode
+## ERD
 
-When Supabase or OpenAI keys are absent, the app runs with seeded local data and a deterministic demo AI response. When Supabase is configured, a signed-in workspace is seeded into Postgres on first use and subsequent prompt/category/run changes are persisted through RLS-protected tables.
+```mermaid
+erDiagram
+  profiles ||--o{ prompt_categories : owns
+  profiles ||--o{ prompts : owns
+  profiles ||--o{ prompt_runs : records
+  profiles ||--o{ prompt_versions : snapshots
+  profiles ||--o{ prompt_evaluations : evaluates
+  profiles ||--o{ workspaces : owns
+  workspaces ||--o{ workspace_members : includes
+  workspaces ||--o{ workspace_invites : invites
+  workspaces ||--o{ prompt_collections : groups
+  prompt_categories ||--o{ prompts : categorizes
+  prompts ||--o{ prompt_versions : versions
+  prompts ||--o{ prompt_runs : tests
+  prompts ||--o{ prompt_evaluations : benchmarks
+  prompt_collections ||--o{ collection_prompts : contains
+  prompts ||--o{ collection_prompts : listed
+```
+
+## API Flow
+
+```mermaid
+flowchart LR
+  Request["Client request"] --> Parse["Zod schema parse"]
+  Parse --> Limit["Upstash Redis rate limit"]
+  Limit --> Session{"Live provider spend?"}
+  Session -->|Yes| Auth["Require Supabase session"]
+  Session -->|No demo| Demo["Deterministic demo response"]
+  Auth --> Adapter["Provider adapter"]
+  Adapter --> Response["Metrics response"]
+  Demo --> Response
+```
+
+## Security Posture
+
+- Provider calls happen only in server routes.
+- OpenAI key is never exposed through `NEXT_PUBLIC_*`.
+- Supabase browser keys are public by design and protected by RLS.
+- Live provider spend requires a Supabase session.
+- Prompt/evaluation payloads are validated with Zod.
+- Production responses set CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, and COOP.
+- New PromptOps tables include RLS policies for owner/member access.
+
+## Scaling Notes
+
+- Dashboard queries remain scoped by `user_id` or workspace membership.
+- Prompt search uses generated full-text vectors and GIN indexes.
+- Prompt versions and evaluations are append-oriented for auditability.
+- Upstash Redis rate limits work across serverless regions.
+- Background job abstraction can be swapped from inline execution to queue workers.
+- Large workspaces should move from load-more UI to cursor pagination backed by `(workspace_id, updated_at, id)` indexes.

@@ -1,9 +1,10 @@
 import OpenAI from "openai";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { publicConfig } from "@/lib/config";
+import { hasSupabaseSession, requiresLiveProviderSession } from "@/lib/api-auth";
+import { apiError } from "@/lib/api-errors";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { serverConfig } from "@/lib/server-config";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -14,25 +15,6 @@ const PromptTestSchema = z.object({
   temperature: z.number().min(0).max(1.5).optional(),
   demoMode: z.boolean().optional().default(false),
 });
-
-const buckets = new Map<string, { count: number; resetAt: number }>();
-
-function allowRequest(key: string) {
-  const now = Date.now();
-  const existing = buckets.get(key);
-
-  if (!existing || existing.resetAt < now) {
-    buckets.set(key, { count: 1, resetAt: now + 60_000 });
-    return true;
-  }
-
-  if (existing.count >= 12) {
-    return false;
-  }
-
-  existing.count += 1;
-  return true;
-}
 
 function demoResponse(prompt: string, input: string) {
   const promptFocus = prompt
@@ -48,35 +30,20 @@ function supportsTemperature(model: string) {
   return !/^(gpt-5|o\d|o[134]|gpt-oss)/i.test(model);
 }
 
-async function hasSupabaseSession() {
-  if (!publicConfig.isSupabaseConfigured) {
-    return false;
-  }
-
-  const supabase = await createServerSupabaseClient();
-
-  if (!supabase) {
-    return false;
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  return Boolean(user);
-}
-
 export async function POST(request: NextRequest) {
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     request.headers.get("x-real-ip") ??
     "local";
 
-  if (!allowRequest(ip)) {
-    return NextResponse.json(
-      { error: "Too many test requests. Please wait a minute and try again." },
-      { status: 429 },
-    );
+  const rate = await checkRateLimit({
+    key: `test:${ip}`,
+    limit: 12,
+    windowSeconds: 60,
+  });
+
+  if (!rate.allowed) {
+    return apiError("Too many test requests. Please wait a minute and try again.", 429);
   }
 
   const startedAt = performance.now();
@@ -113,8 +80,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (
-    serverConfig.isOpenAiConfigured &&
-    publicConfig.isSupabaseConfigured &&
+    (await requiresLiveProviderSession(demoMode)) &&
     !(await hasSupabaseSession())
   ) {
     return NextResponse.json(

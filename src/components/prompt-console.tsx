@@ -1,15 +1,21 @@
 "use client";
 
 import {
+  Activity,
+  BarChart3,
+  Brain,
   Bot,
   Check,
   Clipboard,
+  Command,
   Copy,
   Download,
   ExternalLink,
   Eye,
   Filter,
   Heart,
+  History,
+  Layers3,
   LayoutDashboard,
   Loader2,
   Lock,
@@ -23,19 +29,48 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+  Users,
+  Variable,
   WandSparkles,
   type LucideIcon,
 } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import clsx from "clsx";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { publicConfig } from "@/lib/config";
+import { modelCatalog, type EvaluationResult, type PromptOptimizationResult } from "@/lib/ai/providers";
+import { buildPromptDiff } from "@/lib/prompt-diff";
+import {
+  extractPromptVariables,
+  renderPromptTemplate,
+  suggestPromptVariables,
+  validatePromptVariables,
+} from "@/lib/prompt-variables";
 import {
   createId,
   createShareSlug,
   type ManagedPrompt,
+  normalizeWorkspace,
+  type PromptActivity,
+  type PromptEvaluation,
   type PromptRun,
+  type PromptVersion,
   type PromptWorkspace,
   promptWorkspaceStorageKey,
   seedWorkspace,
@@ -65,6 +100,10 @@ type TestResult = {
   provider: "openai" | "demo";
   latencyMs: number;
 };
+
+type ActiveView = "operate" | "lab" | "analytics" | "team";
+
+type EvaluationTab = "output" | "metrics" | "notes";
 
 const demoCredentials = {
   email: "demo@promptdeck.ai",
@@ -119,8 +158,36 @@ type RunRow = {
   created_at: string;
 };
 
+type VersionRow = {
+  id: string;
+  prompt_id: string;
+  version_number: number;
+  title: string;
+  description: string;
+  content: string;
+  tags: string[];
+  model: string;
+  temperature: number;
+  notes: string;
+  created_at: string;
+};
+
+type EvaluationRow = {
+  id: string;
+  prompt_id: string;
+  provider: "openai" | "anthropic" | "google" | "demo";
+  model: string;
+  input: string;
+  output: string;
+  latency_ms: number;
+  token_estimate: number;
+  output_length: number;
+  quality_score: number;
+  created_at: string;
+};
+
 function cloneSeedWorkspace() {
-  return JSON.parse(JSON.stringify(seedWorkspace)) as PromptWorkspace;
+  return normalizeWorkspace(JSON.parse(JSON.stringify(seedWorkspace)) as PromptWorkspace);
 }
 
 function mapCategory(row: CategoryRow) {
@@ -162,6 +229,38 @@ function mapRun(row: RunRow) {
     model: row.model,
     provider: row.provider,
     latencyMs: row.latency_ms,
+    createdAt: row.created_at,
+  };
+}
+
+function mapVersion(row: VersionRow): PromptVersion {
+  return {
+    id: row.id,
+    promptId: row.prompt_id,
+    versionNumber: row.version_number,
+    title: row.title,
+    description: row.description,
+    content: row.content,
+    tags: row.tags ?? [],
+    model: row.model,
+    temperature: Number(row.temperature),
+    notes: row.notes,
+    createdAt: row.created_at,
+  };
+}
+
+function mapEvaluation(row: EvaluationRow): PromptEvaluation {
+  return {
+    id: row.id,
+    promptId: row.prompt_id,
+    provider: row.provider,
+    model: row.model,
+    input: row.input,
+    output: row.output,
+    latencyMs: row.latency_ms,
+    tokenEstimate: row.token_estimate,
+    outputLength: row.output_length,
+    qualityScore: row.quality_score,
     createdAt: row.created_at,
   };
 }
@@ -236,7 +335,35 @@ async function seedSupabaseWorkspace(supabase: SupabaseClient, userId: string) {
     throw promptError;
   }
 
-  return { categories, prompts, runs: [] };
+  return normalizeWorkspace({ categories, prompts, runs: [] });
+}
+
+async function fetchOptionalPromptOpsTables(supabase: SupabaseClient, userId: string) {
+  const [versionsResult, evaluationsResult] = await Promise.allSettled([
+    supabase
+      .from("prompt_versions")
+      .select("*")
+      .eq("user_id", userId)
+      .order("version_number", { ascending: false })
+      .limit(200),
+    supabase
+      .from("prompt_evaluations")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(200),
+  ]);
+
+  const versions =
+    versionsResult.status === "fulfilled" && !versionsResult.value.error
+      ? ((versionsResult.value.data ?? []) as VersionRow[]).map(mapVersion)
+      : [];
+  const evaluations =
+    evaluationsResult.status === "fulfilled" && !evaluationsResult.value.error
+      ? ((evaluationsResult.value.data ?? []) as EvaluationRow[]).map(mapEvaluation)
+      : [];
+
+  return { versions, evaluations };
 }
 
 async function fetchSupabaseWorkspace(supabase: SupabaseClient, userId: string) {
@@ -277,11 +404,15 @@ async function fetchSupabaseWorkspace(supabase: SupabaseClient, userId: string) 
     throw runError;
   }
 
-  return {
+  const promptOps = await fetchOptionalPromptOpsTables(supabase, userId);
+
+  return normalizeWorkspace({
     categories: (categories as CategoryRow[]).map(mapCategory),
     prompts: (prompts as PromptRow[]).map(mapPrompt),
     runs: ((runs ?? []) as RunRow[]).map(mapRun),
-  };
+    versions: promptOps.versions,
+    evaluations: promptOps.evaluations,
+  });
 }
 
 function formatDate(value: string | null) {
@@ -325,6 +456,9 @@ export function PromptConsole() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [sharedOnly, setSharedOnly] = useState(false);
+  const [activeView, setActiveView] = useState<ActiveView>("operate");
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [visiblePromptCount, setVisiblePromptCount] = useState(8);
   const [authEmail, setAuthEmail] = useState(demoCredentials.email);
   const [authPassword, setAuthPassword] = useState(demoCredentials.password);
   const [authMessage, setAuthMessage] = useState("");
@@ -333,6 +467,15 @@ export function PromptConsole() {
   );
   const [testOutput, setTestOutput] = useState("");
   const [testing, setTesting] = useState(false);
+  const [variableValues, setVariableValues] = useState<Record<string, string>>({});
+  const [versionNotes, setVersionNotes] = useState("");
+  const [evaluationModels, setEvaluationModels] = useState(["gpt-5", "claude-sonnet-4.5"]);
+  const [evaluationResults, setEvaluationResults] = useState<EvaluationResult[]>([]);
+  const [evaluationTab, setEvaluationTab] = useState<EvaluationTab>("output");
+  const [evaluating, setEvaluating] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
+  const [optimization, setOptimization] = useState<PromptOptimizationResult | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("teammate@company.com");
   const [toast, setToast] = useState("");
 
   useEffect(() => {
@@ -343,7 +486,7 @@ export function PromptConsole() {
 
       if (saved && mounted) {
         try {
-          setWorkspace(JSON.parse(saved) as PromptWorkspace);
+          setWorkspace(normalizeWorkspace(JSON.parse(saved) as PromptWorkspace));
         } catch {
           setWorkspace(cloneSeedWorkspace());
         }
@@ -391,6 +534,42 @@ export function PromptConsole() {
       window.localStorage.setItem(promptWorkspaceStorageKey, JSON.stringify(workspace));
     }
   }, [ready, workspace]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const isTyping =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT";
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandOpen((current) => !current);
+        return;
+      }
+
+      if (event.key === "Escape") {
+        setCommandOpen(false);
+        return;
+      }
+
+      if (isTyping) {
+        return;
+      }
+
+      if (event.key.toLowerCase() === "n") {
+        startCreate();
+      }
+
+      if (event.key.toLowerCase() === "a") {
+        setActiveView("analytics");
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
 
   useEffect(() => {
     const activeSupabase = supabase;
@@ -474,11 +653,80 @@ export function PromptConsole() {
     .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
     .slice(0, 4);
 
+  const visiblePrompts = filteredPrompts.slice(0, visiblePromptCount);
+  const promptVariables = useMemo(
+    () => extractPromptVariables(form.content || selectedPrompt?.content || ""),
+    [form.content, selectedPrompt?.content],
+  );
+  const suggestedVariables = useMemo(
+    () => suggestPromptVariables(form.content || selectedPrompt?.content || ""),
+    [form.content, selectedPrompt?.content],
+  );
+  const variablePayload = useMemo(
+    () => ({
+      input: testInput,
+      ...variableValues,
+    }),
+    [testInput, variableValues],
+  );
+  const missingVariables = useMemo(
+    () => validatePromptVariables(promptVariables, variablePayload),
+    [promptVariables, variablePayload],
+  );
+  const renderedPromptPreview = useMemo(
+    () =>
+      renderPromptTemplate(
+        form.content || selectedPrompt?.content || "",
+        variablePayload,
+      ),
+    [form.content, selectedPrompt?.content, variablePayload],
+  );
+  const selectedVersions = workspace.versions
+    .filter((version) => version.promptId === selectedPrompt?.id)
+    .slice()
+    .sort((a, b) => b.versionNumber - a.versionNumber);
+  const latestVersion = selectedVersions[0];
+  const activeWorkspace = workspace.workspaces[0];
+  const analytics = useMemo(() => {
+    const categoryUsage = workspace.categories.map((category) => ({
+      name: category.name,
+      prompts: workspace.prompts.filter((prompt) => prompt.categoryId === category.id).length,
+      runs: workspace.prompts
+        .filter((prompt) => prompt.categoryId === category.id)
+        .reduce((total, prompt) => total + prompt.usageCount, 0),
+      color: category.color,
+    }));
+    const latencyEvents = [...workspace.runs, ...workspace.evaluations]
+      .slice()
+      .sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt))
+      .slice(-8)
+      .map((item, index) => ({
+        name: `Run ${index + 1}`,
+        latency: "latencyMs" in item ? item.latencyMs : 0,
+      }));
+    const favoritePrompts = workspace.prompts
+      .filter((prompt) => prompt.isFavorite)
+      .map((prompt) => ({ name: prompt.title.slice(0, 18), runs: prompt.usageCount }));
+
+    return {
+      categoryUsage,
+      latencyEvents,
+      favoritePrompts,
+      averageLatency:
+        latencyEvents.length > 0
+          ? Math.round(
+              latencyEvents.reduce((total, item) => total + item.latency, 0) /
+                latencyEvents.length,
+            )
+          : 0,
+    };
+  }, [workspace.categories, workspace.evaluations, workspace.prompts, workspace.runs]);
+
   const stats = {
     prompts: workspace.prompts.length,
     favorites: workspace.prompts.filter((prompt) => prompt.isFavorite).length,
     shared: workspace.prompts.filter((prompt) => prompt.isPublic).length,
-    tests: workspace.runs.length,
+    tests: workspace.runs.length + workspace.evaluations.length,
   };
 
   function showToast(message: string) {
@@ -488,6 +736,45 @@ export function PromptConsole() {
 
   function supabaseUserId() {
     return session?.provider === "Supabase" ? session.id : null;
+  }
+
+  function recordActivity(eventType: string, summary: string, promptId?: string | null) {
+    const activity: PromptActivity = {
+      id: createId("activity"),
+      promptId: promptId ?? null,
+      eventType,
+      summary,
+      createdAt: new Date().toISOString(),
+    };
+
+    setWorkspace((current) => ({
+      ...current,
+      activities: [activity, ...current.activities].slice(0, 60),
+    }));
+  }
+
+  function snapshotPromptVersion(prompt: ManagedPrompt, notes: string) {
+    const existingVersions = workspace.versions.filter(
+      (version) => version.promptId === prompt.id,
+    );
+
+    return {
+      id: createId("version"),
+      promptId: prompt.id,
+      versionNumber:
+        existingVersions.reduce(
+          (max, version) => Math.max(max, version.versionNumber),
+          0,
+        ) + 1,
+      title: prompt.title,
+      description: prompt.description,
+      content: prompt.content,
+      tags: prompt.tags,
+      model: prompt.model,
+      temperature: prompt.temperature,
+      notes: notes.trim() || "Prompt edited.",
+      createdAt: new Date().toISOString(),
+    } satisfies PromptVersion;
   }
 
   function isDemoCredentials() {
@@ -552,6 +839,33 @@ export function PromptConsole() {
 
     if (error) {
       showToast(`Run sync failed: ${error.message}`);
+    }
+  }
+
+  async function persistEvaluation(evaluation: PromptEvaluation) {
+    const userId = supabaseUserId();
+
+    if (!supabase || !userId) {
+      return;
+    }
+
+    const { error } = await supabase.from("prompt_evaluations").insert({
+      id: evaluation.id,
+      user_id: userId,
+      prompt_id: evaluation.promptId,
+      input: evaluation.input,
+      output: evaluation.output,
+      model: evaluation.model,
+      provider: evaluation.provider,
+      latency_ms: evaluation.latencyMs,
+      token_estimate: evaluation.tokenEstimate,
+      output_length: evaluation.outputLength,
+      quality_score: evaluation.qualityScore,
+      created_at: evaluation.createdAt,
+    });
+
+    if (error && !/prompt_evaluations/i.test(error.message)) {
+      showToast(`Evaluation sync failed: ${error.message}`);
     }
   }
 
@@ -635,6 +949,8 @@ export function PromptConsole() {
 
     setEditingPromptId(null);
     setForm(emptyForm(categoryId));
+    setOptimization(null);
+    setVersionNotes("");
   }
 
   function startEdit(prompt: ManagedPrompt) {
@@ -650,6 +966,8 @@ export function PromptConsole() {
       temperature: prompt.temperature,
       isPublic: prompt.isPublic,
     });
+    setVersionNotes("");
+    setOptimization(null);
   }
 
   function promptIdForCurrentMode(prefix: string) {
@@ -698,13 +1016,20 @@ export function PromptConsole() {
           : null,
         updatedAt: timestamp,
       };
+      const version = snapshotPromptVersion(existing, versionNotes);
 
       setWorkspace((current) => ({
         ...current,
+        versions: [version, ...current.versions],
         prompts: current.prompts.map((prompt) =>
           prompt.id === editingPromptId ? updatedPrompt : prompt,
         ),
       }));
+      recordActivity(
+        "prompt.versioned",
+        `Saved v${version.versionNumber} before updating ${existing.title}.`,
+        existing.id,
+      );
       void persistPrompt(updatedPrompt);
     } else {
       const id = promptIdForCurrentMode("prompt");
@@ -728,25 +1053,38 @@ export function PromptConsole() {
 
       setWorkspace((current) => ({ ...current, prompts: [prompt, ...current.prompts] }));
       setSelectedPromptId(id);
+      recordActivity("prompt.created", `Created ${prompt.title}.`, prompt.id);
       void persistPrompt(prompt);
     }
 
     setEditingPromptId(null);
     setForm(emptyForm(form.categoryId));
+    setVersionNotes("");
     showToast(editingPromptId ? "Prompt updated." : "Prompt saved.");
   }
 
   function deletePrompt(promptId: string) {
+    const deletedPrompt = workspace.prompts.find((prompt) => prompt.id === promptId);
+
     setWorkspace((current) => {
       const prompts = current.prompts.filter((prompt) => prompt.id !== promptId);
       return {
         ...current,
         prompts,
         runs: current.runs.filter((run) => run.promptId !== promptId),
+        versions: current.versions.filter((version) => version.promptId !== promptId),
+        evaluations: current.evaluations.filter(
+          (evaluation) => evaluation.promptId !== promptId,
+        ),
       };
     });
 
     showToast("Prompt deleted.");
+    recordActivity(
+      "prompt.deleted",
+      `Deleted ${deletedPrompt?.title ?? "a prompt"}.`,
+      promptId,
+    );
     void deleteSupabasePrompt(promptId);
   }
 
@@ -769,6 +1107,11 @@ export function PromptConsole() {
         prompt.id === promptId ? updatedPrompt : prompt,
       ),
     }));
+    recordActivity(
+      "prompt.favorite",
+      `${updatedPrompt.isFavorite ? "Favorited" : "Unfavorited"} ${updatedPrompt.title}.`,
+      promptId,
+    );
     void persistPrompt(updatedPrompt);
   }
 
@@ -794,6 +1137,11 @@ export function PromptConsole() {
         prompt.id === promptId ? updatedPrompt : prompt,
       ),
     }));
+    recordActivity(
+      "prompt.share",
+      `${updatedPrompt.isPublic ? "Shared" : "Privatized"} ${updatedPrompt.title}.`,
+      promptId,
+    );
     void persistPrompt(updatedPrompt);
   }
 
@@ -816,7 +1164,48 @@ export function PromptConsole() {
     setSelectedPromptId(copy.id);
     startEdit(copy);
     showToast("Prompt duplicated.");
+    recordActivity("prompt.duplicated", `Duplicated ${prompt.title}.`, copy.id);
     void persistPrompt(copy);
+  }
+
+  function rollbackToVersion(version: PromptVersion) {
+    const existing = workspace.prompts.find((prompt) => prompt.id === version.promptId);
+
+    if (!existing) {
+      showToast("Prompt not found for rollback.");
+      return;
+    }
+
+    const snapshot = snapshotPromptVersion(
+      existing,
+      `Rollback point before restoring v${version.versionNumber}.`,
+    );
+    const restoredPrompt: ManagedPrompt = {
+      ...existing,
+      title: version.title,
+      description: version.description,
+      content: version.content,
+      tags: version.tags,
+      model: version.model,
+      temperature: version.temperature,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setWorkspace((current) => ({
+      ...current,
+      versions: [snapshot, ...current.versions],
+      prompts: current.prompts.map((prompt) =>
+        prompt.id === restoredPrompt.id ? restoredPrompt : prompt,
+      ),
+    }));
+    startEdit(restoredPrompt);
+    showToast(`Rolled back to v${version.versionNumber}.`);
+    recordActivity(
+      "prompt.rollback",
+      `Rolled back ${existing.title} to v${version.versionNumber}.`,
+      existing.id,
+    );
+    void persistPrompt(restoredPrompt);
   }
 
   async function copyShareLink(prompt: ManagedPrompt) {
@@ -836,6 +1225,7 @@ export function PromptConsole() {
           item.id === prompt.id ? updatedPrompt : item,
         ),
       }));
+      recordActivity("prompt.shared", `Enabled public sharing for ${prompt.title}.`, prompt.id);
       void persistPrompt(updatedPrompt);
     }
 
@@ -864,15 +1254,21 @@ export function PromptConsole() {
       return;
     }
 
+    if (missingVariables.length) {
+      showToast(`Add values for: ${missingVariables.join(", ")}`);
+      return;
+    }
+
     setTesting(true);
     setTestOutput("");
+    const renderedPrompt = renderPromptTemplate(selectedPrompt.content, variablePayload);
 
     try {
       const response = await fetch("/api/test-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: selectedPrompt.content,
+          prompt: renderedPrompt,
           input: testInput,
           model: selectedPrompt.model,
           temperature: selectedPrompt.temperature,
@@ -913,6 +1309,11 @@ export function PromptConsole() {
           prompt.id === selectedPrompt.id ? updatedPrompt : prompt,
         ),
       }));
+      recordActivity(
+        "prompt.tested",
+        `Tested ${selectedPrompt.title} with ${payload.provider}.`,
+        selectedPrompt.id,
+      );
       void persistRun(run);
       void persistPrompt(updatedPrompt);
     } catch (error) {
@@ -921,6 +1322,164 @@ export function PromptConsole() {
       setTesting(false);
     }
   }
+
+  async function runSideBySideEvaluation() {
+    if (!selectedPrompt) {
+      return;
+    }
+
+    if (missingVariables.length) {
+      showToast(`Add values for: ${missingVariables.join(", ")}`);
+      return;
+    }
+
+    setEvaluating(true);
+    const renderedPrompt = renderPromptTemplate(selectedPrompt.content, variablePayload);
+
+    try {
+      const response = await fetch("/api/evaluate-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: renderedPrompt,
+          input: testInput,
+          models: evaluationModels,
+          demoMode: session?.provider === "Demo",
+        }),
+      });
+      const payload = (await response.json()) as {
+        evaluations?: EvaluationResult[];
+        error?: string;
+      };
+
+      if (!response.ok || !payload.evaluations) {
+        throw new Error(payload.error ?? "Evaluation failed.");
+      }
+
+      const timestamp = new Date().toISOString();
+      const evaluations = payload.evaluations.map((evaluation) => ({
+        ...evaluation,
+        id: promptIdForCurrentMode("eval"),
+        promptId: selectedPrompt.id,
+        input: testInput,
+        createdAt: timestamp,
+      })) satisfies PromptEvaluation[];
+
+      setEvaluationResults(payload.evaluations);
+      setWorkspace((current) => ({
+        ...current,
+        evaluations: [...evaluations, ...current.evaluations].slice(0, 200),
+      }));
+      evaluations.forEach((evaluation) => {
+        void persistEvaluation(evaluation);
+      });
+      recordActivity(
+        "evaluation.completed",
+        `Compared ${selectedPrompt.title} across ${evaluations.length} model adapters.`,
+        selectedPrompt.id,
+      );
+      showToast("Side-by-side evaluation complete.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Evaluation failed.");
+    } finally {
+      setEvaluating(false);
+    }
+  }
+
+  async function improvePrompt() {
+    const sourcePrompt = form.content || selectedPrompt?.content;
+
+    if (!sourcePrompt) {
+      showToast("Choose or write a prompt first.");
+      return;
+    }
+
+    setOptimizing(true);
+
+    try {
+      const response = await fetch("/api/optimize-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: sourcePrompt,
+          demoMode: session?.provider === "Demo",
+        }),
+      });
+      const payload = (await response.json()) as PromptOptimizationResult & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Prompt optimization failed.");
+      }
+
+      setOptimization(payload);
+      recordActivity(
+        "prompt.optimized",
+        `Generated optimization guidance for ${form.title || selectedPrompt?.title || "draft prompt"}.`,
+        selectedPrompt?.id,
+      );
+      showToast("Prompt improvement suggestions ready.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Prompt optimization failed.");
+    } finally {
+      setOptimizing(false);
+    }
+  }
+
+  function applyOptimization() {
+    if (!optimization) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      content: optimization.improvedPrompt,
+      tags: Array.from(
+        new Set([
+          ...current.tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+          "optimized",
+          "promptops",
+        ]),
+      ).join(", "),
+    }));
+    showToast("Improved prompt applied to the builder.");
+  }
+
+  function inviteMember() {
+    const email = inviteEmail.trim();
+
+    if (!email) {
+      showToast("Enter an email for the invite.");
+      return;
+    }
+
+    const member = {
+      id: createId("member"),
+      workspaceId: activeWorkspace?.id ?? "workspace-promptops",
+      email,
+      role: "viewer",
+      status: "invited",
+    } satisfies PromptWorkspace["members"][number];
+
+    setWorkspace((current) => ({
+      ...current,
+      members: [member, ...current.members],
+    }));
+    recordActivity("workspace.invite", `Queued invite for ${email}.`, null);
+    setInviteEmail("");
+    showToast("Invite queued.");
+  }
+
+  const viewTabs: { view: ActiveView; icon: LucideIcon; label: string }[] = [
+    { view: "operate", icon: LayoutDashboard, label: "Operate" },
+    { view: "lab", icon: Brain, label: "AI Lab" },
+    { view: "analytics", icon: BarChart3, label: "Analytics" },
+    { view: "team", icon: Users, label: "Team" },
+  ];
 
   return (
     <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
@@ -932,15 +1491,19 @@ export function PromptConsole() {
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0f766e]">
-                AI workflow console
+                PromptOps workflow operating system
               </p>
               <h1 className="truncate text-2xl font-semibold tracking-normal sm:text-3xl">
-                PromptDeck AI
+                PromptDeck OS
               </h1>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <button className="btn-secondary" onClick={() => setCommandOpen(true)}>
+              <Command size={16} aria-hidden="true" />
+              Cmd+K
+            </button>
             <StatusBadge
               icon={publicConfig.isSupabaseConfigured ? ShieldCheck : Lock}
               label={
@@ -963,6 +1526,29 @@ export function PromptConsole() {
             </button>
           </div>
         </header>
+
+        <nav className="flex flex-wrap items-center gap-2 border-b border-black/10 py-3">
+          {viewTabs.map(({ view, icon: TabIcon, label }) => {
+            return (
+              <button
+                key={view}
+                className={clsx(
+                  "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-semibold",
+                  activeView === view
+                    ? "border-black bg-black text-white"
+                    : "border-black/10 bg-white/70 text-black/65 hover:bg-white",
+                )}
+                onClick={() => setActiveView(view)}
+              >
+                <TabIcon size={15} aria-hidden="true" />
+                {label}
+              </button>
+            );
+          })}
+          <span className="ml-auto hidden text-xs font-medium uppercase tracking-[0.16em] text-black/40 lg:inline">
+            N new prompt / A analytics / Cmd+K command
+          </span>
+        </nav>
 
         <section className="grid flex-1 gap-4 py-4 xl:grid-cols-[280px_minmax(0,1fr)_380px]">
           <aside className="flex min-w-0 flex-col gap-4">
@@ -1101,7 +1687,7 @@ export function PromptConsole() {
                 </div>
 
                 <div className="max-h-[640px] space-y-2 overflow-y-auto pr-1">
-                  {filteredPrompts.map((prompt) => {
+                  {visiblePrompts.map((prompt) => {
                     const category = categoryById.get(prompt.categoryId);
                     const active = selectedPrompt?.id === prompt.id;
 
@@ -1195,6 +1781,15 @@ export function PromptConsole() {
                       No prompts match the active filters.
                     </div>
                   ) : null}
+                  {filteredPrompts.length > visiblePromptCount ? (
+                    <button
+                      className="btn-secondary w-full justify-center"
+                      onClick={() => setVisiblePromptCount((count) => count + 8)}
+                    >
+                      <Layers3 size={16} aria-hidden="true" />
+                      Load more prompts
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </Panel>
@@ -1243,12 +1838,95 @@ export function PromptConsole() {
                   />
                 </label>
 
+                <div className="rounded-lg border border-black/10 bg-white p-3">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      <Variable size={15} aria-hidden="true" />
+                      Variables
+                    </div>
+                    <span className="text-xs text-black/45">
+                      {promptVariables.length} detected
+                    </span>
+                  </div>
+                  {promptVariables.length ? (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {promptVariables.map((variable) => (
+                        <label key={variable.name} className="space-y-1">
+                          <span className="text-xs font-medium text-black/55">
+                            {variable.token}
+                          </span>
+                          <input
+                            className="input"
+                            value={
+                              variable.name === "input"
+                                ? testInput
+                                : variableValues[variable.name] ?? ""
+                            }
+                            onChange={(event) => {
+                              if (variable.name === "input") {
+                                setTestInput(event.target.value);
+                                return;
+                              }
+
+                              setVariableValues((current) => ({
+                                ...current,
+                                [variable.name]: event.target.value,
+                              }));
+                            }}
+                            placeholder={variable.description}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-black/55">
+                      Add tokens like {"{{audience}}"} or {"{{context}}"} to generate dynamic inputs.
+                    </p>
+                  )}
+                  {suggestedVariables.length ? (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {suggestedVariables.map((variable) => (
+                        <button
+                          key={variable}
+                          type="button"
+                          className="tag hover:bg-black/10"
+                          onClick={() =>
+                            setForm((current) => ({
+                              ...current,
+                              content: `${current.content}\n\n${variable}:\n{{${variable}}}`,
+                            }))
+                          }
+                        >
+                          + {`{{${variable}}}`}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#0b1120] p-3 text-xs leading-5 text-white">
+                    {renderedPromptPreview || "Rendered prompt preview"}
+                  </pre>
+                  {missingVariables.length ? (
+                    <p className="mt-2 text-xs font-medium text-[#be123c]">
+                      Missing required values: {missingVariables.join(", ")}
+                    </p>
+                  ) : null}
+                </div>
+
                 <TextInput
                   label="Tags"
                   value={form.tags}
                   onChange={(value) => setForm({ ...form, tags: value })}
                   placeholder="strategy, review, workflow"
                 />
+
+                {editingPromptId ? (
+                  <TextInput
+                    label="Version notes"
+                    value={versionNotes}
+                    onChange={setVersionNotes}
+                    placeholder="What changed in this prompt?"
+                  />
+                ) : null}
 
                 <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
                   <label className="space-y-1.5">
@@ -1284,11 +1962,58 @@ export function PromptConsole() {
                     <Save size={16} aria-hidden="true" />
                     {editingPromptId ? "Update prompt" : "Save prompt"}
                   </button>
+                  <button
+                    className="btn-secondary"
+                    type="button"
+                    onClick={() => void improvePrompt()}
+                    disabled={optimizing}
+                  >
+                    {optimizing ? (
+                      <Loader2 className="animate-spin" size={16} aria-hidden="true" />
+                    ) : (
+                      <Brain size={16} aria-hidden="true" />
+                    )}
+                    Improve Prompt
+                  </button>
                   <button className="btn-secondary" type="button" onClick={startCreate}>
                     <Plus size={16} aria-hidden="true" />
                     Clear
                   </button>
                 </div>
+
+                {optimization ? (
+                  <div className="rounded-lg border border-[#0f766e]/25 bg-[#ecfdf5] p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">Optimization score {optimization.qualityScore}</p>
+                        <p className="mt-1 text-sm leading-6 text-black/65">
+                          {optimization.summary}
+                        </p>
+                      </div>
+                      <button
+                        className="btn-secondary bg-white"
+                        type="button"
+                        onClick={applyOptimization}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+                      <ul className="space-y-1">
+                        {optimization.suggestions.slice(0, 4).map((suggestion) => (
+                          <li key={suggestion}>- {suggestion}</li>
+                        ))}
+                      </ul>
+                      <ul className="space-y-1 text-[#854d0e]">
+                        {optimization.riskFlags.length ? (
+                          optimization.riskFlags.map((risk) => <li key={risk}>- {risk}</li>)
+                        ) : (
+                          <li>- No major hallucination risk detected.</li>
+                        )}
+                      </ul>
+                    </div>
+                  </div>
+                ) : null}
               </form>
             </Panel>
           </section>
@@ -1350,6 +2075,80 @@ export function PromptConsole() {
                     Test prompt
                   </button>
 
+                  <div className="rounded-lg border border-black/10 bg-white p-3">
+                    <div className="mb-3 grid gap-2 sm:flex sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-2 text-sm font-semibold">
+                        <Brain size={15} aria-hidden="true" />
+                        Side-by-side evaluation
+                      </div>
+                      <div className="flex rounded-md border border-black/10 bg-[#f8fafc] p-0.5">
+                        {(["output", "metrics", "notes"] as EvaluationTab[]).map((tab) => (
+                          <button
+                            key={tab}
+                            className={clsx(
+                              "rounded px-2 py-1 text-xs font-semibold capitalize",
+                              evaluationTab === tab ? "bg-black text-white" : "text-black/55",
+                            )}
+                            onClick={() => setEvaluationTab(tab)}
+                          >
+                            {tab}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      {modelCatalog.map((model) => (
+                        <label
+                          key={model.id}
+                          className="flex items-center justify-between gap-3 rounded-md border border-black/10 px-2 py-2 text-sm"
+                        >
+                          <span>
+                            <span className="font-semibold">{model.label}</span>
+                            <span className="ml-2 text-xs text-black/45">
+                              {model.family} {model.status === "adapter" ? "adapter" : "live"}
+                            </span>
+                          </span>
+                          <input
+                            className="accent-[#0f766e]"
+                            type="checkbox"
+                            checked={evaluationModels.includes(model.id)}
+                            onChange={(event) =>
+                              setEvaluationModels((current) =>
+                                event.target.checked
+                                  ? [...new Set([...current, model.id])].slice(0, 4)
+                                  : current.filter((item) => item !== model.id),
+                              )
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <button
+                      className="btn-secondary mt-3 w-full justify-center"
+                      onClick={() => void runSideBySideEvaluation()}
+                      disabled={evaluating || evaluationModels.length === 0}
+                    >
+                      {evaluating ? (
+                        <Loader2 className="animate-spin" size={16} aria-hidden="true" />
+                      ) : (
+                        <BarChart3 size={16} aria-hidden="true" />
+                      )}
+                      Compare models
+                    </button>
+                  </div>
+
+                  {evaluationResults.length ? (
+                    <div className="space-y-2">
+                      {evaluationResults.map((evaluation) => (
+                        <EvaluationCard
+                          key={evaluation.id}
+                          evaluation={evaluation}
+                          tab={evaluationTab}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+
                   <div className="min-h-44 rounded-lg border border-black/10 bg-[#101828] p-4 text-sm leading-6 text-white">
                     {testOutput || "Run a test to see the AI response here."}
                   </div>
@@ -1387,9 +2186,84 @@ export function PromptConsole() {
                 <p className="text-sm text-black/55">Create a prompt to start testing.</p>
               )}
             </Panel>
+
+            <div className="mt-4">
+              <Panel title="Version History" icon={History}>
+                {selectedPrompt && selectedVersions.length ? (
+                  <div className="space-y-3">
+                    {selectedVersions.slice(0, 5).map((version) => (
+                      <div
+                        key={version.id}
+                        className="rounded-lg border border-black/10 bg-white p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold">
+                              v{version.versionNumber} - {formatDate(version.createdAt)}
+                            </p>
+                            <p className="mt-1 text-xs leading-5 text-black/55">
+                              {version.notes}
+                            </p>
+                          </div>
+                          <button
+                            className="btn-icon"
+                            title="Rollback to this version"
+                            aria-label="Rollback to this version"
+                            onClick={() => rollbackToVersion(version)}
+                          >
+                            <History size={15} aria-hidden="true" />
+                          </button>
+                        </div>
+                        {latestVersion?.id === version.id ? (
+                          <PromptDiffView
+                            before={version.content}
+                            after={selectedPrompt.content}
+                          />
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-lg border border-dashed border-black/20 bg-white p-4 text-sm text-black/55">
+                    Edits will create historical versions with rollback and diff support.
+                  </p>
+                )}
+              </Panel>
+            </div>
           </aside>
         </section>
+
+        {activeView === "analytics" ? (
+          <AnalyticsDashboard analytics={analytics} activities={workspace.activities} />
+        ) : null}
+
+        {activeView === "team" ? (
+          <TeamWorkspacePanel
+            workspaceName={activeWorkspace?.name ?? "PromptOps Lab"}
+            collections={workspace.collections}
+            members={workspace.members}
+            inviteEmail={inviteEmail}
+            onInviteEmailChange={setInviteEmail}
+            onInvite={inviteMember}
+          />
+        ) : null}
       </div>
+
+      <CommandPalette
+        open={commandOpen}
+        onClose={() => setCommandOpen(false)}
+        actions={[
+          { label: "Create new prompt", icon: Plus, run: startCreate },
+          { label: "Improve current prompt", icon: Brain, run: () => void improvePrompt() },
+          {
+            label: "Run side-by-side evaluation",
+            icon: BarChart3,
+            run: () => void runSideBySideEvaluation(),
+          },
+          { label: "Open analytics", icon: Activity, run: () => setActiveView("analytics") },
+          { label: "Open team workspace", icon: Users, run: () => setActiveView("team") },
+        ]}
+      />
 
       {toast ? (
         <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-black px-4 py-3 text-sm font-medium text-white shadow-lg">
@@ -1398,6 +2272,291 @@ export function PromptConsole() {
         </div>
       ) : null}
     </main>
+  );
+}
+
+function EvaluationCard({
+  evaluation,
+  tab,
+}: {
+  evaluation: EvaluationResult;
+  tab: EvaluationTab;
+}) {
+  return (
+    <article className="rounded-lg border border-black/10 bg-white p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">{evaluation.model}</p>
+          <p className="mt-1 text-xs uppercase tracking-[0.14em] text-black/45">
+            {evaluation.provider}
+          </p>
+        </div>
+        <span className="rounded-md bg-[#ecfdf5] px-2 py-1 text-xs font-semibold text-[#0f766e]">
+          {evaluation.qualityScore}/100
+        </span>
+      </div>
+      {tab === "output" ? (
+        <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-[#0b1120] p-3 text-xs leading-5 text-white">
+          {evaluation.output}
+        </pre>
+      ) : null}
+      {tab === "metrics" ? (
+        <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
+          <Info label="Latency" value={`${evaluation.latencyMs}ms`} />
+          <Info label="Tokens" value={`${evaluation.tokenEstimate}`} />
+          <Info label="Length" value={`${evaluation.outputLength}`} />
+        </dl>
+      ) : null}
+      {tab === "notes" ? (
+        <ul className="mt-3 space-y-1 text-sm leading-6 text-black/65">
+          {evaluation.notes.map((note) => (
+            <li key={note}>- {note}</li>
+          ))}
+        </ul>
+      ) : null}
+    </article>
+  );
+}
+
+function PromptDiffView({ before, after }: { before: string; after: string }) {
+  const rows = buildPromptDiff(before, after).slice(0, 12);
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-lg border border-black/10 text-xs">
+      {rows.map((row) => (
+        <div
+          key={row.id}
+          className={clsx(
+            "grid grid-cols-[28px_minmax(0,1fr)] gap-2 px-2 py-1 font-mono",
+            row.kind === "added" && "bg-[#ecfdf5] text-[#166534]",
+            row.kind === "removed" && "bg-[#fff1f2] text-[#9f1239]",
+            row.kind === "unchanged" && "bg-white text-black/50",
+          )}
+        >
+          <span>{row.kind === "added" ? "+" : row.kind === "removed" ? "-" : " "}</span>
+          <span className="truncate">{row.text || " "}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AnalyticsDashboard({
+  analytics,
+  activities,
+}: {
+  analytics: {
+    categoryUsage: { name: string; prompts: number; runs: number; color: string }[];
+    latencyEvents: { name: string; latency: number }[];
+    favoritePrompts: { name: string; runs: number }[];
+    averageLatency: number;
+  };
+  activities: PromptActivity[];
+}) {
+  return (
+    <section className="grid gap-4 pb-6 xl:grid-cols-[1.2fr_0.8fr]">
+      <Panel title="PromptOps Analytics" icon={BarChart3}>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="h-72 rounded-lg border border-black/10 bg-white p-3">
+            <p className="mb-2 text-sm font-semibold">Category usage</p>
+            <ResponsiveContainer width="100%" height="88%">
+              <BarChart data={analytics.categoryUsage}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} />
+                <Tooltip />
+                <Bar dataKey="runs" radius={[6, 6, 0, 0]}>
+                  {analytics.categoryUsage.map((item) => (
+                    <Cell key={item.name} fill={item.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="h-72 rounded-lg border border-black/10 bg-white p-3">
+            <p className="mb-2 text-sm font-semibold">
+              Latency trend - avg {analytics.averageLatency}ms
+            </p>
+            <ResponsiveContainer width="100%" height="88%">
+              <LineChart data={analytics.latencyEvents}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} />
+                <Tooltip />
+                <Line type="monotone" dataKey="latency" stroke="#0f766e" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="h-72 rounded-lg border border-black/10 bg-white p-3 lg:col-span-2">
+            <p className="mb-2 text-sm font-semibold">Favorite prompt frequency</p>
+            <ResponsiveContainer width="100%" height="88%">
+              <PieChart>
+                <Pie
+                  data={analytics.favoritePrompts}
+                  dataKey="runs"
+                  nameKey="name"
+                  innerRadius={52}
+                  outerRadius={92}
+                  paddingAngle={3}
+                >
+                  {analytics.favoritePrompts.map((item, index) => (
+                    <Cell
+                      key={item.name}
+                      fill={["#0f766e", "#2563eb", "#be123c", "#b45309"][index % 4]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </Panel>
+
+      <Panel title="Activity Timeline" icon={Activity}>
+        <div className="space-y-2">
+          {activities.slice(0, 10).map((activity) => (
+            <div key={activity.id} className="rounded-lg border border-black/10 bg-white p-3">
+              <p className="text-sm font-semibold">{activity.summary}</p>
+              <p className="mt-1 text-xs text-black/45">
+                {activity.eventType} - {formatDate(activity.createdAt)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </Panel>
+    </section>
+  );
+}
+
+function TeamWorkspacePanel({
+  workspaceName,
+  collections,
+  members,
+  inviteEmail,
+  onInviteEmailChange,
+  onInvite,
+}: {
+  workspaceName: string;
+  collections: PromptWorkspace["collections"];
+  members: PromptWorkspace["members"];
+  inviteEmail: string;
+  onInviteEmailChange: (value: string) => void;
+  onInvite: () => void;
+}) {
+  return (
+    <section className="grid gap-4 pb-6 xl:grid-cols-[0.9fr_1.1fr]">
+      <Panel title="Workspace Control Plane" icon={Users}>
+        <div className="rounded-lg border border-black/10 bg-white p-4">
+          <p className="text-lg font-semibold">{workspaceName}</p>
+          <p className="mt-1 text-sm leading-6 text-black/60">
+            Team ownership, shared collections, and role foundations for a production PromptOps program.
+          </p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+            <input
+              className="input"
+              value={inviteEmail}
+              onChange={(event) => onInviteEmailChange(event.target.value)}
+              placeholder="teammate@company.com"
+            />
+            <button className="btn-primary justify-center" onClick={onInvite}>
+              <Plus size={16} aria-hidden="true" />
+              Invite
+            </button>
+          </div>
+        </div>
+        <div className="mt-3 space-y-2">
+          {members.map((member) => (
+            <div
+              key={member.id}
+              className="flex items-center justify-between gap-3 rounded-lg border border-black/10 bg-white p-3 text-sm"
+            >
+              <span className="truncate font-semibold">{member.email}</span>
+              <span className="rounded-md bg-black/[0.05] px-2 py-1 text-xs font-semibold">
+                {member.role} / {member.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      <Panel title="Shared Collections" icon={Layers3}>
+        <div className="grid gap-3 md:grid-cols-2">
+          {collections.map((collection) => (
+            <article
+              key={collection.id}
+              className="rounded-lg border border-black/10 bg-white p-4"
+            >
+              <p className="text-sm font-semibold">{collection.name}</p>
+              <p className="mt-2 text-sm leading-6 text-black/60">
+                {collection.description}
+              </p>
+              <div className="mt-3 flex items-center justify-between text-xs text-black/45">
+                <span>{collection.promptIds.length} prompts</span>
+                <span>{collection.visibility}</span>
+              </div>
+            </article>
+          ))}
+        </div>
+      </Panel>
+    </section>
+  );
+}
+
+function CommandPalette({
+  open,
+  onClose,
+  actions,
+}: {
+  open: boolean;
+  onClose: () => void;
+  actions: { label: string; icon: LucideIcon; run: () => void }[];
+}) {
+  return (
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          className="fixed inset-0 z-50 bg-black/30 px-4 py-20 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+        >
+          <motion.div
+            className="mx-auto max-w-xl overflow-hidden rounded-lg border border-white/40 bg-white shadow-2xl"
+            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-black/10 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Command size={16} aria-hidden="true" />
+                PromptOps command palette
+              </div>
+            </div>
+            <div className="p-2">
+              {actions.map((action) => {
+                const Icon = action.icon;
+                return (
+                  <button
+                    key={action.label}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-semibold hover:bg-black/[0.04]"
+                    onClick={() => {
+                      action.run();
+                      onClose();
+                    }}
+                  >
+                    <Icon size={16} aria-hidden="true" />
+                    {action.label}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 }
 
