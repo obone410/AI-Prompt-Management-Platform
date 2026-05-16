@@ -1,6 +1,6 @@
 # Supabase Setup
 
-PromptDeck AI v2.0 includes Supabase schema, indexes, triggers, RPCs, and RLS policies in `supabase/migrations`.
+PromptDeck AI v3.0 includes Supabase schema, indexes, triggers, RPCs, and RLS policies in `supabase/migrations`.
 
 ## Migration Order
 
@@ -11,8 +11,11 @@ Apply migrations in filename order:
 3. `202605160002_promptops_operating_system.sql`
 4. `202605160003_prompt_experiments_costs.sql`
 5. `202605160004_ai_workflow_operating_system.sql`
+6. `202605160005_ai_operations_platform.sql`
 
 The fifth migration adds v2.0 AI workflow operating-system tables: organizations, audit logs, `experiments`, `experiment_runs`, evaluation datasets/presets, prompt deployments, deployment history, AI workflows, and workflow run logs.
+
+The sixth migration adds the v3.0 AI operations execution model: `ai_runs`, `ai_artifacts`, `ai_metrics`, agents, agent runs, agent memory/tools, benchmark suites/datasets/runs/scores, trace sessions/steps/logs, prompt intelligence, and prompt releases.
 
 ## Tables
 
@@ -37,6 +40,22 @@ The fifth migration adds v2.0 AI workflow operating-system tables: organizations
 - `organization_members`: organization roles and permissions
 - `audit_logs`: immutable activity/audit feed target
 - `prompt_activity`: workspace activity timeline events
+- `ai_runs`: central execution log for prompts, evaluations, experiments, workflows, deployments, agents, and benchmarks
+- `ai_artifacts`: versioned outputs emitted by executions
+- `ai_metrics`: queryable metrics across all execution systems
+- `agents`: first-class agent definitions and capabilities
+- `agent_runs`: multi-step agent execution history
+- `agent_memory`: persistent agent memory records
+- `agent_tools`: mock/connected tool abstractions per agent/workspace
+- `benchmark_suites`: reusable benchmark configuration
+- `benchmark_datasets`: examples and expected outputs by task type
+- `benchmark_runs`: prompt/model/dataset benchmark execution results
+- `benchmark_scores`: reusable benchmark metric scores
+- `trace_sessions`: root trace tree per execution
+- `trace_steps`: nested execution steps with latency, tokens, and cost
+- `trace_logs`: trace-level logs and warnings
+- `prompt_intelligence`: health, clustering, duplicate, and model recommendation scores
+- `prompt_releases`: release tags, staged rollout, health, and rollback metadata
 - `workspaces`: ownership boundary for teams
 - `workspace_members`: team role assignments
 - `workspace_invites`: invite UI persistence target
@@ -68,6 +87,19 @@ The fifth migration adds v2.0 AI workflow operating-system tables: organizations
 | `organization_members` | Organization members can read; owner manages. |
 | `audit_logs` | Actor or workspace member read; actor inserts. |
 | `prompt_activity` | Owner or workspace member read; owner insert. |
+| `ai_runs` | Actor or workspace member read; actor insert/update. |
+| `ai_artifacts` | Actor or workspace member read; actor insert. |
+| `ai_metrics` | Actor or workspace member read; actor insert. |
+| `agents` | Actor or workspace member read; actor writes. |
+| `agent_runs` | Actor or workspace member through agent access; actor inserts. |
+| `agent_memory` | Actor or workspace member through agent access; actor writes. |
+| `agent_tools` | Actor or workspace member read; actor writes. |
+| `benchmark_suites` / `benchmark_datasets` | Actor or workspace member read; actor writes. |
+| `benchmark_runs` / `benchmark_scores` | Actor or workspace member through suite/run access; actor inserts. |
+| `trace_sessions` | Actor or workspace member read; actor inserts. |
+| `trace_steps` / `trace_logs` | Actor or workspace member through trace access; actor inserts. |
+| `prompt_intelligence` | Actor or workspace member read; actor writes. |
+| `prompt_releases` | Actor or workspace member read; actor writes. |
 | `workspaces` | Owner/member read; owner write. |
 | `workspace_members` | Workspace members can read; owner manages. |
 | `workspace_invites` | Workspace members can read; owner manages. |
@@ -111,6 +143,11 @@ The app also keeps local demo-mode versions with user-facing changelog notes and
 - Deployments: `prompt_deployments_env_idx`, `deployment_history_deployment_idx`
 - Workflows: `ai_workflows_workspace_idx`, `workflow_runs_workflow_idx`
 - Organizations/audit: `organizations_owner_idx`, `organization_members_user_idx`, `audit_logs_workspace_idx`
+- AI operations: `ai_runs_workspace_started_idx`, `ai_runs_entity_idx`, `ai_runs_parent_idx`, `ai_artifacts_workspace_idx`, `ai_metrics_workspace_scope_idx`
+- Agents: `agents_workspace_idx`, `agent_runs_agent_idx`
+- Benchmarks: `benchmark_runs_suite_idx`
+- Traces: `trace_sessions_workspace_idx`, `trace_steps_trace_idx`, `trace_logs_trace_idx`
+- Releases/intelligence: `prompt_intelligence_workspace_idx`, `prompt_releases_workspace_idx`
 - Workspaces: `workspaces_owner_idx`, `workspace_members_user_idx`
 - Activity: `prompt_activity_workspace_idx`
 

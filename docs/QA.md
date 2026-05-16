@@ -15,8 +15,12 @@ Coverage:
 - AI-assisted prompt optimization renders suggestions in demo mode.
 - Side-by-side model evaluation renders GPT and Claude adapter cards in demo mode.
 - Experiment workflows render lifecycle status, datasets, reusable rubrics, score trends, and benchmark history.
+- AI Operations command center renders lifecycle, global search, prompt health, and top runs.
+- AI Benchmarking Engine renders suites, datasets, leaderboard, heatmap, regression alerts, and benchmark execution.
+- Agent Builder renders agents, tool inspector, memory, execution canvas, and trace timeline.
+- Observability Center renders unified AI runs, trace tree, artifacts, logs, and performance breakdown.
 - Workflow Studio renders prompt, variable, condition, and output nodes with run history and execution logs.
-- Deployment Center renders Development, Staging, and Production lifecycle controls with rollback and promotion actions.
+- Release Management renders Development, Staging, and Production lifecycle controls with rollout, health, rollback, and promotion actions.
 - Analytics and Team tabs render from the production build.
 - Shared prompt page renders the public prompt preview.
 - Screenshots were refreshed from a production build.
@@ -26,9 +30,12 @@ Coverage:
 Artifacts:
 
 - `docs/screenshots/dashboard-desktop.png`
+- `docs/screenshots/operations-desktop.png`
 - `docs/screenshots/experiments-desktop.png`
 - `docs/screenshots/workflows-desktop.png`
+- `docs/screenshots/agents-desktop.png`
 - `docs/screenshots/deployments-desktop.png`
+- `docs/screenshots/observability-desktop.png`
 - `docs/screenshots/dashboard-mobile.png`
 - `docs/screenshots/shared-prompt.png`
 - `docs/screenshots/live-production-security.png`
@@ -42,19 +49,21 @@ Result:
 
 - Homepage returned `200`.
 - Share route returned `200`.
-- Production title returned `PromptDeck AI v2.0 — AI Workflow Operating System`.
-- Version marker `AI Workflow OS v2.0.0` rendered in the live UI.
+- Production title returned `PromptDeck AI v3.0 — AI Operations Platform`.
+- Version marker `AI Operations OS v3.0.0` rendered in the live UI.
 - Browser console errors: `0`.
 - Failed network requests: `0`.
 - Unexpected 4xx/5xx page asset responses: `0`.
 - Live unauthenticated `POST /api/test-prompt` returned `401`, confirming provider spend is gated behind Supabase auth.
+- Demo sign-in rendered `Demo session` and did not create a Supabase account.
+- Operations, Benchmarks, Agents, Workflows, Releases, Observability, Analytics, and Team views opened on production.
 
 Performance spot check:
 
 | Route | DOMContentLoaded | Load | FCP | Transferred |
 | --- | ---: | ---: | ---: | ---: |
-| `/` | 501 ms | 638 ms | 572 ms | 447 KB |
-| `/share/product-brief` | 1183 ms | 1279 ms | 1276 ms | 220 KB |
+| `/` | 474 ms | 768 ms | 548 ms | 458 KB |
+| `/share/product-brief` | 928 ms | 995 ms | 944 ms | 224 KB |
 
 ## Command Verification
 
@@ -84,7 +93,7 @@ Latest production scan:
 
 Summary:
 
-- Deployed HTML and 9 generated JavaScript assets were scanned.
+- Deployed HTML and 8 generated JavaScript assets were scanned.
 - No OpenAI, Vercel, or Supabase service-role secrets were found in deployed assets.
 - The only deployed key-like values found were the expected public Supabase URL and publishable key.
 - Security headers are present on production responses.
@@ -97,5 +106,5 @@ These are intentionally absent from the repository and must be configured in loc
 - `OPENAI_API_KEY` is configured in Vercel Production and Development environments, but values are encrypted/write-only.
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `SENTRY_DSN`, and `POSTHOG_PROJECT_API_KEY` are optional production integrations and are not committed.
 - Vercel Production and Development env vars are configured; Preview env vars were not present in the CLI listing and should be added before preview deployments are used.
-- Supabase migrations are applied to project `gujupmdzuonefgliqrdu`; future schema changes still require privileged Supabase management access because public anon/publishable keys cannot apply DDL.
+- Supabase migrations are applied to project `gujupmdzuonefgliqrdu`, including the v3 `ai_operations_platform` migration; future schema changes still require privileged Supabase management access because public anon/publishable keys cannot apply DDL.
 - GitHub remote is configured; pushing depends on local GitHub authentication.

@@ -118,10 +118,12 @@ type TestResult = {
 };
 
 type ActiveView =
-  | "operate"
-  | "experiments"
+  | "operations"
   | "workflows"
+  | "benchmarks"
+  | "agents"
   | "deployments"
+  | "observability"
   | "analytics"
   | "team";
 
@@ -491,7 +493,7 @@ function downloadFile(filename: string, content: string, type: string) {
 
 export function PromptConsole() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(true);
   const [session, setSession] = useState<UserSession | null>(null);
   const [workspace, setWorkspace] = useState<PromptWorkspace>(() =>
     cloneSeedWorkspace(),
@@ -503,7 +505,7 @@ export function PromptConsole() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [sharedOnly, setSharedOnly] = useState(false);
-  const [activeView, setActiveView] = useState<ActiveView>("experiments");
+  const [activeView, setActiveView] = useState<ActiveView>("operations");
   const [commandOpen, setCommandOpen] = useState(false);
   const [visiblePromptCount, setVisiblePromptCount] = useState(8);
   const [authEmail, setAuthEmail] = useState(demoCredentials.email);
@@ -524,10 +526,16 @@ export function PromptConsole() {
     "experiment-prd-optimization",
   );
   const [selectedWorkflowId, setSelectedWorkflowId] = useState("workflow-research-brief");
+  const [selectedAgentId, setSelectedAgentId] = useState("agent-research");
+  const [selectedBenchmarkSuiteId, setSelectedBenchmarkSuiteId] =
+    useState("benchmark-suite-prd");
+  const [selectedTraceId, setSelectedTraceId] = useState("trace-agent-research");
   const [deploymentEnvironment, setDeploymentEnvironment] =
     useState<DeploymentEnvironment>("production");
   const [experimentRunning, setExperimentRunning] = useState(false);
   const [workflowRunning, setWorkflowRunning] = useState(false);
+  const [agentRunning, setAgentRunning] = useState(false);
+  const [benchmarkRunning, setBenchmarkRunning] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
   const [optimization, setOptimization] = useState<PromptOptimizationResult | null>(null);
   const [inviteEmail, setInviteEmail] = useState("teammate@company.com");
@@ -554,15 +562,19 @@ export function PromptConsole() {
         return;
       }
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const authResult = await Promise.race([
+          supabase.auth.getUser(),
+          new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 2500)),
+        ]);
+        const user = authResult?.data.user;
 
-      if (user?.email) {
-        setSession({ id: user.id, email: user.email, provider: "Supabase" });
+        if (user?.email) {
+          setSession({ id: user.id, email: user.email, provider: "Supabase" });
+        }
+      } finally {
+        setReady(true);
       }
-
-      setReady(true);
     }
 
     void loadAuth();
@@ -618,11 +630,11 @@ export function PromptConsole() {
       }
 
       if (event.key.toLowerCase() === "a") {
-        setActiveView("analytics");
+        setActiveView("agents");
       }
 
       if (event.key.toLowerCase() === "e") {
-        setActiveView("experiments");
+        setActiveView("benchmarks");
       }
 
       if (event.key.toLowerCase() === "w") {
@@ -631,6 +643,10 @@ export function PromptConsole() {
 
       if (event.key.toLowerCase() === "d") {
         setActiveView("deployments");
+      }
+
+      if (event.key.toLowerCase() === "o") {
+        setActiveView("observability");
       }
     }
 
@@ -760,6 +776,22 @@ export function PromptConsole() {
   const selectedWorkflow =
     workspace.aiWorkflows.find((workflow) => workflow.id === selectedWorkflowId) ??
     workspace.aiWorkflows[0];
+  const selectedAgent =
+    workspace.agents.find((agent) => agent.id === selectedAgentId) ?? workspace.agents[0];
+  const selectedAgentRun =
+    workspace.agentRuns.find((run) => run.agentId === selectedAgent?.id) ??
+    workspace.agentRuns[0];
+  const selectedBenchmarkSuite =
+    workspace.benchmarkSuites.find((suite) => suite.id === selectedBenchmarkSuiteId) ??
+    workspace.benchmarkSuites[0];
+  const selectedTrace =
+    workspace.traceSessions.find((trace) => trace.id === selectedTraceId) ??
+    workspace.traceSessions[0];
+  const selectedPromptIntelligence = selectedPrompt
+    ? workspace.promptIntelligence.find(
+        (insight) => insight.promptId === selectedPrompt.id,
+      )
+    : undefined;
   const activeDeployments = workspace.deployments.filter(
     (deployment) => deployment.environment === deploymentEnvironment,
   );
@@ -886,6 +918,10 @@ export function PromptConsole() {
     experiments: workspace.experiments.length,
     workflows: workspace.aiWorkflows.length,
     deployments: workspace.deployments.length,
+    agents: workspace.agents.length,
+    benchmarks: workspace.benchmarkSuites.length,
+    traces: workspace.traceSessions.length,
+    aiRuns: workspace.aiRuns.length,
   };
 
   function showToast(message: string) {
@@ -910,6 +946,142 @@ export function PromptConsole() {
       ...current,
       activities: [activity, ...current.activities].slice(0, 60),
     }));
+  }
+
+  function buildOperationTrace({
+    entityType,
+    entityId,
+    name,
+    model,
+    provider,
+    latencyMs,
+    inputTokens,
+    outputTokens,
+    cost,
+    qualityScore,
+    steps,
+    artifactTitle,
+    artifactContent,
+  }: {
+    entityType: PromptWorkspace["aiRuns"][number]["entityType"];
+    entityId: string;
+    name: string;
+    model: string;
+    provider: PromptWorkspace["aiRuns"][number]["provider"];
+    latencyMs: number;
+    inputTokens: number;
+    outputTokens: number;
+    cost: number;
+    qualityScore: number;
+    steps: { label: string; kind: PromptWorkspace["traceSteps"][number]["kind"] }[];
+    artifactTitle: string;
+    artifactContent: string;
+  }) {
+    const startedAt = new Date().toISOString();
+    const completedAt = new Date(Date.now() + latencyMs).toISOString();
+    const workspaceId = activeWorkspace?.id ?? "workspace-promptops";
+    const traceId = promptIdForCurrentMode("trace");
+    const runId = promptIdForCurrentMode("ai-run");
+
+    const run = {
+      id: runId,
+      workspaceId,
+      entityType,
+      entityId,
+      traceId,
+      status: "completed",
+      model,
+      provider,
+      latencyMs,
+      inputTokenEstimate: inputTokens,
+      outputTokenEstimate: outputTokens,
+      estimatedCostUsd: cost,
+      qualityScore,
+      startedAt,
+      completedAt,
+      parentRunId: null,
+    } satisfies PromptWorkspace["aiRuns"][number];
+    const trace = {
+      id: traceId,
+      rootRunId: runId,
+      workspaceId,
+      entityType,
+      entityId,
+      name,
+      status: "completed",
+      startedAt,
+      endedAt: completedAt,
+      totalLatencyMs: latencyMs,
+      totalCostUsd: cost,
+    } satisfies PromptWorkspace["traceSessions"][number];
+    const stepIds = steps.map(() => promptIdForCurrentMode("trace-step"));
+    const traceSteps = steps.map((step, index) => ({
+      id: stepIds[index],
+      traceId,
+      parentStepId: index === 0 ? null : stepIds[index - 1],
+      label: step.label,
+      kind: step.kind,
+      status: "completed",
+      latencyMs: Math.max(40, Math.round(latencyMs / Math.max(1, steps.length))),
+      tokenEstimate: Math.round((inputTokens + outputTokens) / Math.max(1, steps.length)),
+      estimatedCostUsd: Number((cost / Math.max(1, steps.length)).toFixed(6)),
+      startedAt,
+      endedAt: completedAt,
+      depth: index,
+    })) satisfies PromptWorkspace["traceSteps"];
+    const artifact = {
+      id: promptIdForCurrentMode("artifact"),
+      runId,
+      workspaceId,
+      kind:
+        entityType === "agent"
+          ? "agent_memory"
+          : entityType === "benchmark"
+            ? "benchmark_report"
+            : entityType === "deployment"
+              ? "release_note"
+              : entityType === "workflow"
+                ? "workflow_output"
+                : "prompt_output",
+      title: artifactTitle,
+      content: artifactContent,
+      version: 1,
+      createdAt: completedAt,
+    } satisfies PromptWorkspace["aiArtifacts"][number];
+    const metrics = [
+      {
+        id: promptIdForCurrentMode("metric"),
+        runId,
+        workspaceId,
+        scope: entityType,
+        name: "latency",
+        value: latencyMs,
+        unit: "ms",
+        createdAt: completedAt,
+      },
+      {
+        id: promptIdForCurrentMode("metric"),
+        runId,
+        workspaceId,
+        scope: entityType,
+        name: "quality score",
+        value: qualityScore,
+        unit: "score",
+        createdAt: completedAt,
+      },
+      {
+        id: promptIdForCurrentMode("metric"),
+        runId,
+        workspaceId,
+        scope: entityType,
+        name: "estimated cost",
+        value: cost,
+        unit: "usd",
+        createdAt: completedAt,
+      },
+    ] satisfies PromptWorkspace["aiMetrics"];
+
+    return { run, trace, traceSteps, artifact, metrics };
   }
 
   function snapshotPromptVersion(prompt: ManagedPrompt, notes: string) {
@@ -1539,14 +1711,39 @@ export function PromptConsole() {
         latencyMs: payload.latencyMs,
         createdAt: timestamp,
       };
+      const operation = buildOperationTrace({
+        entityType: "prompt",
+        entityId: run.id,
+        name: `${selectedPrompt.title} prompt run`,
+        model: payload.model,
+        provider: payload.provider,
+        latencyMs: payload.latencyMs,
+        inputTokens: Math.max(1, Math.ceil(renderedPrompt.length / 4)),
+        outputTokens: Math.max(1, Math.ceil(payload.output.length / 4)),
+        cost: payload.provider === "demo" ? 0 : 0.0012,
+        qualityScore: 86,
+        steps: [
+          { label: "Render prompt template", kind: "prompt" },
+          { label: "Call model provider", kind: "model" },
+          { label: "Persist response artifact", kind: "artifact" },
+        ],
+        artifactTitle: `${selectedPrompt.title} output`,
+        artifactContent: payload.output,
+      });
 
       setWorkspace((current) => ({
         ...current,
         runs: [run, ...current.runs],
+        aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+        aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
+        aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
+        traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+        traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
         prompts: current.prompts.map((prompt) =>
           prompt.id === selectedPrompt.id ? updatedPrompt : prompt,
         ),
       }));
+      setSelectedTraceId(operation.trace.id);
       recordActivity(
         "prompt.tested",
         `Tested ${selectedPrompt.title} with ${payload.provider}.`,
@@ -1602,12 +1799,51 @@ export function PromptConsole() {
         input: testInput,
         createdAt: timestamp,
       })) satisfies PromptEvaluation[];
+      const operations = evaluations.map((evaluation) =>
+        buildOperationTrace({
+          entityType: "evaluation",
+          entityId: evaluation.id,
+          name: `${selectedPrompt.title} ${evaluation.model} evaluation`,
+          model: evaluation.model,
+          provider: evaluation.provider,
+          latencyMs: evaluation.latencyMs,
+          inputTokens: evaluation.inputTokenEstimate,
+          outputTokens: evaluation.outputTokenEstimate,
+          cost: evaluation.estimatedCostUsd,
+          qualityScore: evaluation.qualityScore,
+          steps: [
+            { label: "Prepare rubric context", kind: "prompt" },
+            { label: "Run model comparison", kind: "model" },
+            { label: "Score quality metrics", kind: "artifact" },
+          ],
+          artifactTitle: `${evaluation.model} evaluation output`,
+          artifactContent: evaluation.output,
+        }),
+      );
 
       setEvaluationResults(payload.evaluations);
       setWorkspace((current) => ({
         ...current,
         evaluations: [...evaluations, ...current.evaluations].slice(0, 200),
+        aiRuns: [...operations.map((operation) => operation.run), ...current.aiRuns].slice(0, 300),
+        aiArtifacts: [
+          ...operations.map((operation) => operation.artifact),
+          ...current.aiArtifacts,
+        ].slice(0, 300),
+        aiMetrics: [
+          ...operations.flatMap((operation) => operation.metrics),
+          ...current.aiMetrics,
+        ].slice(0, 600),
+        traceSessions: [
+          ...operations.map((operation) => operation.trace),
+          ...current.traceSessions,
+        ].slice(0, 200),
+        traceSteps: [
+          ...operations.flatMap((operation) => operation.traceSteps),
+          ...current.traceSteps,
+        ].slice(0, 800),
       }));
+      setSelectedTraceId(operations[0]?.trace.id ?? selectedTraceId);
       evaluations.forEach((evaluation) => {
         void persistEvaluation(evaluation);
       });
@@ -1678,7 +1914,7 @@ export function PromptConsole() {
       experiments: [experiment, ...current.experiments],
     }));
     setSelectedExperimentId(experiment.id);
-    setActiveView("experiments");
+    setActiveView("benchmarks");
     recordActivity(
       "experiment.created",
       `Created experiment for ${selectedPrompt.title}.`,
@@ -1750,13 +1986,48 @@ export function PromptConsole() {
         results,
         updatedAt: timestamp,
       } satisfies PromptExperiment;
+      const averageQuality = results.length
+        ? Math.round(
+            results.reduce((total, result) => total + result.qualityScore, 0) /
+              results.length,
+          )
+        : 0;
+      const operation = buildOperationTrace({
+        entityType: "experiment",
+        entityId: experiment.id,
+        name: `${experiment.title} experiment run`,
+        model: "multi-model",
+        provider: "demo",
+        latencyMs: results.reduce((total, result) => total + result.latencyMs, 0),
+        inputTokens: results.reduce((total, result) => total + result.inputTokenEstimate, 0),
+        outputTokens: results.reduce((total, result) => total + result.outputTokenEstimate, 0),
+        cost: Number(
+          results
+            .reduce((total, result) => total + result.estimatedCostUsd, 0)
+            .toFixed(6),
+        ),
+        qualityScore: averageQuality,
+        steps: [
+          { label: "Generate prompt variants", kind: "prompt" },
+          { label: "Execute model matrix", kind: "parallel" },
+          { label: "Rank variants and persist scores", kind: "artifact" },
+        ],
+        artifactTitle: `${experiment.title} benchmark report`,
+        artifactContent: `Ranked ${results.length} variant/model outputs with average score ${averageQuality}.`,
+      });
 
       setWorkspace((current) => ({
         ...current,
         experiments: current.experiments.map((item) =>
           item.id === experiment.id ? updatedExperiment : item,
         ),
+        aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+        aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
+        aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
+        traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+        traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
       }));
+      setSelectedTraceId(operation.trace.id);
       recordActivity(
         "experiment.completed",
         `Ran ${experiment.title} across ${results.length} variant/model comparisons.`,
@@ -1788,11 +2059,36 @@ export function PromptConsole() {
       ],
       createdAt: timestamp,
     } satisfies PromptWorkspace["workflowRuns"][number];
+    const operation = buildOperationTrace({
+      entityType: "workflow",
+      entityId: run.id,
+      name: `${workflow.name} workflow execution`,
+      model: "multi-model",
+      provider: "demo",
+      latencyMs: run.latencyMs,
+      inputTokens: Math.round(run.tokenEstimate * 0.55),
+      outputTokens: Math.round(run.tokenEstimate * 0.45),
+      cost: run.estimatedCostUsd,
+      qualityScore: 90,
+      steps: [
+        { label: "Hydrate workflow state", kind: "prompt" },
+        { label: "Run condition and loop nodes", kind: "loop" },
+        { label: "Execute parallel model branch", kind: "parallel" },
+        { label: "Persist workflow artifact", kind: "artifact" },
+      ],
+      artifactTitle: `${workflow.name} output artifact`,
+      artifactContent: run.logs.join("\n"),
+    });
 
     window.setTimeout(() => {
       setWorkspace((current) => ({
         ...current,
         workflowRuns: [run, ...current.workflowRuns].slice(0, 100),
+        aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+        aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
+        aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
+        traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+        traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
         auditLogs: [
           {
             id: createId("audit"),
@@ -1809,8 +2105,162 @@ export function PromptConsole() {
         `Completed ${workflow.name} with ${workflow.nodes.length} nodes.`,
         workflow.nodes.find((node) => node.promptId)?.promptId,
       );
+      setSelectedTraceId(operation.trace.id);
       setWorkflowRunning(false);
       showToast("Workflow run complete.");
+    }, 450);
+  }
+
+  function runAgent(agent: PromptWorkspace["agents"][number]) {
+    setAgentRunning(true);
+    const timestamp = new Date().toISOString();
+    const traceId = promptIdForCurrentMode("trace");
+    const run = {
+      id: promptIdForCurrentMode("agent-run"),
+      agentId: agent.id,
+      traceId,
+      objective: `Execute ${agent.name} against the selected AI operations lifecycle.`,
+      status: "completed",
+      latencyMs: 1750 + agent.tools.length * 180,
+      tokenEstimate: 980 + agent.memoryKeys.length * 110,
+      estimatedCostUsd: Number((0.0042 + agent.tools.length * 0.0011).toFixed(6)),
+      createdAt: timestamp,
+      steps: [
+        {
+          id: promptIdForCurrentMode("agent-step"),
+          label: "Plan execution",
+          kind: "reasoning",
+          status: "completed",
+          detail: "Selected tools, memory, and branch strategy.",
+          latencyMs: 340,
+          tokenEstimate: 210,
+        },
+        {
+          id: promptIdForCurrentMode("agent-step"),
+          label: `Invoke ${agent.tools[0] ?? "tool"} tool`,
+          kind: "tool_call",
+          status: "completed",
+          detail: "Tool abstraction returned deterministic demo context.",
+          latencyMs: 520,
+          tokenEstimate: 260,
+        },
+        {
+          id: promptIdForCurrentMode("agent-step"),
+          label: "Persist memory and final artifact",
+          kind: "final",
+          status: "completed",
+          detail: "Stored run trace, memory update, artifact, and metrics.",
+          latencyMs: 890,
+          tokenEstimate: 610,
+        },
+      ],
+    } satisfies PromptWorkspace["agentRuns"][number];
+    const operation = buildOperationTrace({
+      entityType: "agent",
+      entityId: run.id,
+      name: `${agent.name} execution`,
+      model: "gpt-5",
+      provider: "demo",
+      latencyMs: run.latencyMs,
+      inputTokens: Math.round(run.tokenEstimate * 0.6),
+      outputTokens: Math.round(run.tokenEstimate * 0.4),
+      cost: run.estimatedCostUsd,
+      qualityScore: 91,
+      steps: [
+        { label: "Reason about objective", kind: "model" },
+        { label: "Call agent tool", kind: "tool" },
+        { label: "Write memory and artifact", kind: "artifact" },
+      ],
+      artifactTitle: `${agent.name} run artifact`,
+      artifactContent: run.steps.map((step) => step.detail).join("\n"),
+    });
+    const memory = {
+      id: promptIdForCurrentMode("memory"),
+      agentId: agent.id,
+      key: "latest_run_summary",
+      value: `${agent.name} completed a multi-step execution with ${agent.tools.length} tool abstractions.`,
+      updatedAt: timestamp,
+    } satisfies PromptWorkspace["agentMemory"][number];
+
+    window.setTimeout(() => {
+      setWorkspace((current) => ({
+        ...current,
+        agentRuns: [run, ...current.agentRuns].slice(0, 100),
+        agentMemory: [memory, ...current.agentMemory].slice(0, 100),
+        aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+        aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
+        aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
+        traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+        traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
+      }));
+      setSelectedTraceId(operation.trace.id);
+      setAgentRunning(false);
+      showToast("Agent execution complete.");
+    }, 450);
+  }
+
+  function runBenchmarkSuite(suite: PromptWorkspace["benchmarkSuites"][number]) {
+    setBenchmarkRunning(true);
+    const timestamp = new Date().toISOString();
+    const promptId = suite.promptIds[0] ?? selectedPrompt?.id ?? "prompt-prd";
+    const model = suite.modelIds[0] ?? "gpt-5";
+    const datasetId = suite.datasetIds[0] ?? "benchmark-dataset-product";
+    const run = {
+      id: promptIdForCurrentMode("benchmark-run"),
+      suiteId: suite.id,
+      promptId,
+      model,
+      datasetId,
+      status: "completed",
+      accuracy: 93,
+      hallucinationRate: 7,
+      latencyMs: 430,
+      estimatedCostUsd: 0.00108,
+      consistencyScore: 92,
+      regressionDelta: 4,
+      createdAt: timestamp,
+    } satisfies PromptWorkspace["benchmarkRuns"][number];
+    const score = {
+      id: promptIdForCurrentMode("benchmark-score"),
+      runId: run.id,
+      metric: "human feedback placeholder",
+      value: 90,
+      createdAt: timestamp,
+    } satisfies PromptWorkspace["benchmarkScores"][number];
+    const operation = buildOperationTrace({
+      entityType: "benchmark",
+      entityId: run.id,
+      name: `${suite.name} benchmark run`,
+      model,
+      provider: "demo",
+      latencyMs: run.latencyMs,
+      inputTokens: 180,
+      outputTokens: 120,
+      cost: run.estimatedCostUsd,
+      qualityScore: run.accuracy,
+      steps: [
+        { label: "Load benchmark dataset", kind: "prompt" },
+        { label: "Execute model/prompt matrix", kind: "parallel" },
+        { label: "Detect regression and update leaderboard", kind: "artifact" },
+      ],
+      artifactTitle: `${suite.name} report`,
+      artifactContent: `Accuracy ${run.accuracy}, hallucination rate ${run.hallucinationRate}, regression delta ${run.regressionDelta}.`,
+    });
+
+    window.setTimeout(() => {
+      setWorkspace((current) => ({
+        ...current,
+        benchmarkRuns: [run, ...current.benchmarkRuns].slice(0, 120),
+        benchmarkScores: [score, ...current.benchmarkScores].slice(0, 240),
+        aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+        aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
+        aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
+        traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+        traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
+      }));
+      setSelectedTraceId(operation.trace.id);
+      setBenchmarkRunning(false);
+      showToast("Benchmark suite complete.");
     }, 450);
   }
 
@@ -1829,7 +2279,7 @@ export function PromptConsole() {
       environment,
       status: "active",
       deployedBy: session?.email ?? "demo@promptdeck.ai",
-      metadata: `Deployed from PromptDeck AI v2.0.0 to ${environment}.`,
+      metadata: `Deployed from PromptDeck AI v3.0.0 to ${environment}.`,
       createdAt: timestamp,
     };
     const history = {
@@ -1839,11 +2289,48 @@ export function PromptConsole() {
       summary: `Deployed ${selectedPrompt.title} to ${environment}.`,
       createdAt: timestamp,
     } satisfies PromptWorkspace["deploymentHistory"][number];
+    const release = {
+      id: promptIdForCurrentMode("release"),
+      deploymentId: deployment.id,
+      versionId: version.id,
+      tag: `${createShareSlug(selectedPrompt.title)}@${version.versionNumber}.0.0`,
+      environment,
+      status: environment === "production" ? "watching" : "healthy",
+      rolloutPercent: environment === "production" ? 25 : 100,
+      healthScore: 88,
+      notes: "Release created with benchmark, trace, and rollback metadata.",
+      createdAt: timestamp,
+    } satisfies PromptWorkspace["promptReleases"][number];
+    const operation = buildOperationTrace({
+      entityType: "deployment",
+      entityId: deployment.id,
+      name: `${selectedPrompt.title} ${environment} release`,
+      model: selectedPrompt.model,
+      provider: "system",
+      latencyMs: 180,
+      inputTokens: 0,
+      outputTokens: 0,
+      cost: 0,
+      qualityScore: release.healthScore,
+      steps: [
+        { label: "Capture release snapshot", kind: "release" },
+        { label: "Apply environment metadata", kind: "artifact" },
+        { label: "Start rollout monitor", kind: "release" },
+      ],
+      artifactTitle: `${release.tag} release note`,
+      artifactContent: release.notes,
+    });
 
     setWorkspace((current) => ({
       ...current,
       deployments: [deployment, ...current.deployments],
       deploymentHistory: [history, ...current.deploymentHistory],
+      promptReleases: [release, ...current.promptReleases],
+      aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+      aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
+      aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
+      traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+      traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
       auditLogs: [
         {
           id: createId("audit"),
@@ -1861,6 +2348,7 @@ export function PromptConsole() {
       `Deployed ${selectedPrompt.title} to ${environment}.`,
       selectedPrompt.id,
     );
+    setSelectedTraceId(operation.trace.id);
     showToast(`Deployed to ${environment}.`);
   }
 
@@ -2009,10 +2497,12 @@ export function PromptConsole() {
   }
 
   const viewTabs: { view: ActiveView; icon: LucideIcon; label: string }[] = [
-    { view: "operate", icon: LayoutDashboard, label: "Operate" },
-    { view: "experiments", icon: Workflow, label: "Experiments" },
+    { view: "operations", icon: LayoutDashboard, label: "Operations" },
     { view: "workflows", icon: Blocks, label: "Workflows" },
-    { view: "deployments", icon: Rocket, label: "Deploy" },
+    { view: "benchmarks", icon: Gauge, label: "Benchmarks" },
+    { view: "agents", icon: Bot, label: "Agents" },
+    { view: "deployments", icon: Rocket, label: "Releases" },
+    { view: "observability", icon: Activity, label: "Observability" },
     { view: "analytics", icon: BarChart3, label: "Analytics" },
     { view: "team", icon: Users, label: "Team" },
   ];
@@ -2029,10 +2519,10 @@ export function PromptConsole() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0f766e]">
-                    AI Workflow OS v2.0.0
+                    AI Operations OS v3.0.0
                   </p>
                   <p className="text-sm font-semibold text-black/55">
-                    LLMOps, experiments, deployments, and workflow infrastructure
+                    Unified LLMOps, agents, traces, benchmarks, and releases
                   </p>
                 </div>
               </div>
@@ -2040,8 +2530,9 @@ export function PromptConsole() {
                 PromptDeck AI
               </h1>
               <p className="mt-5 max-w-3xl text-lg leading-8 text-black/60 sm:text-xl">
-                A venture-scale AI workflow operating system for prompt lifecycle,
-                experiments, evaluation infrastructure, deployments, and inference operations.
+                A production-grade AI operations platform where prompts, versions,
+                experiments, evaluations, workflows, agents, releases, and observability
+                share one execution model.
               </p>
               <div className="mt-6 flex flex-wrap gap-2">
                 <StatusBadge icon={ServerCog} label="Redis rate limits" />
@@ -2052,10 +2543,10 @@ export function PromptConsole() {
             </div>
 
             <div className="grid min-w-[260px] gap-3 sm:grid-cols-2 lg:grid-cols-1">
-              <Metric label="Prompts" value={stats.prompts} />
-              <Metric label="Experiments" value={stats.experiments} />
+                <Metric label="Prompts" value={stats.prompts} />
+              <Metric label="AI runs" value={stats.aiRuns} />
               <Metric label="Workflows" value={stats.workflows} />
-              <Metric label="Deployments" value={stats.deployments} />
+              <Metric label="Agents" value={stats.agents} />
             </div>
           </div>
 
@@ -2120,11 +2611,20 @@ export function PromptConsole() {
             );
           })}
           <span className="ml-auto hidden text-xs font-medium uppercase tracking-[0.16em] text-black/40 lg:inline">
-            N new / E experiments / W workflows / D deploy / Cmd+K
+            N new / E benchmarks / W workflows / A agents / O traces / Cmd+K
           </span>
         </nav>
 
-        {activeView === "operate" ? (
+        {activeView === "operations" ? (
+          <>
+            <OperationsCommandCenter
+              workspace={workspace}
+              selectedPrompt={selectedPrompt}
+              promptIntelligence={selectedPromptIntelligence}
+              onOpenBenchmarks={() => setActiveView("benchmarks")}
+              onOpenAgents={() => setActiveView("agents")}
+              onOpenObservability={() => setActiveView("observability")}
+            />
         <section className="grid flex-1 gap-6 py-7 xl:grid-cols-[300px_minmax(0,1fr)_420px]">
           <aside className="flex min-w-0 flex-col gap-4">
             <Panel title="Account" icon={Lock}>
@@ -2807,15 +3307,20 @@ export function PromptConsole() {
             </div>
           </aside>
         </section>
+          </>
         ) : null}
 
-        {activeView === "experiments" ? (
+        {activeView === "benchmarks" ? (
           <ExperimentLab
             experiments={workspace.experiments}
             experimentWorkflows={workspace.experimentWorkflows}
             experimentRuns={workspace.experimentRuns}
             datasets={workspace.evaluationDatasets}
             presets={workspace.evaluationPresets}
+            benchmarkSuites={workspace.benchmarkSuites}
+            benchmarkRuns={workspace.benchmarkRuns}
+            benchmarkDatasets={workspace.benchmarkDatasets}
+            selectedBenchmarkSuite={selectedBenchmarkSuite}
             selectedExperiment={selectedExperiment}
             selectedPrompt={selectedPrompt}
             evaluationModels={evaluationModels}
@@ -2823,11 +3328,14 @@ export function PromptConsole() {
             evaluationTab={evaluationTab}
             evaluating={evaluating}
             experimentRunning={experimentRunning}
+            benchmarkRunning={benchmarkRunning}
             testInput={testInput}
             onTestInputChange={setTestInput}
             onSelectExperiment={setSelectedExperimentId}
+            onSelectBenchmarkSuite={setSelectedBenchmarkSuiteId}
             onCreateExperiment={createExperimentFromPrompt}
             onRunExperiment={(experiment) => void runPromptExperiment(experiment)}
+            onRunBenchmark={runBenchmarkSuite}
             onRunEvaluation={() => void runSideBySideEvaluation()}
             onEvaluationTabChange={setEvaluationTab}
             onToggleModel={(modelId, checked) =>
@@ -2851,17 +3359,45 @@ export function PromptConsole() {
           />
         ) : null}
 
+        {activeView === "agents" ? (
+          <AgentOperationsPanel
+            agents={workspace.agents}
+            agentRuns={workspace.agentRuns}
+            agentMemory={workspace.agentMemory}
+            agentTools={workspace.agentTools}
+            selectedAgent={selectedAgent}
+            selectedRun={selectedAgentRun}
+            running={agentRunning}
+            onSelectAgent={setSelectedAgentId}
+            onRunAgent={runAgent}
+          />
+        ) : null}
+
         {activeView === "deployments" ? (
           <DeploymentCenter
             prompts={workspace.prompts}
             versions={workspace.versions}
             deployments={activeDeployments}
             history={workspace.deploymentHistory}
+            releases={workspace.promptReleases}
             environment={deploymentEnvironment}
             onEnvironmentChange={setDeploymentEnvironment}
             onDeploy={deploySelectedPrompt}
             onPromote={promoteDeployment}
             onRollback={rollbackDeployment}
+          />
+        ) : null}
+
+        {activeView === "observability" ? (
+          <ObservabilityCenter
+            runs={workspace.aiRuns}
+            artifacts={workspace.aiArtifacts}
+            metrics={workspace.aiMetrics}
+            traces={workspace.traceSessions}
+            steps={workspace.traceSteps}
+            logs={workspace.traceLogs}
+            selectedTrace={selectedTrace}
+            onSelectTrace={setSelectedTraceId}
           />
         ) : null}
 
@@ -2900,9 +3436,9 @@ export function PromptConsole() {
             run: createExperimentFromPrompt,
           },
           {
-            label: "Open experiments",
-            icon: Workflow,
-            run: () => setActiveView("experiments"),
+            label: "Open benchmarking engine",
+            icon: Gauge,
+            run: () => setActiveView("benchmarks"),
           },
           {
             label: "Open workflow studio",
@@ -2910,14 +3446,34 @@ export function PromptConsole() {
             run: () => setActiveView("workflows"),
           },
           {
-            label: "Open deployments",
+            label: "Open agent builder",
+            icon: Bot,
+            run: () => setActiveView("agents"),
+          },
+          {
+            label: "Open release management",
             icon: Rocket,
             run: () => setActiveView("deployments"),
+          },
+          {
+            label: "Open observability traces",
+            icon: Activity,
+            run: () => setActiveView("observability"),
           },
           {
             label: "Run selected workflow",
             icon: Sparkles,
             run: () => selectedWorkflow && runWorkflow(selectedWorkflow),
+          },
+          {
+            label: "Run selected agent",
+            icon: Bot,
+            run: () => selectedAgent && runAgent(selectedAgent),
+          },
+          {
+            label: "Run selected benchmark suite",
+            icon: Gauge,
+            run: () => selectedBenchmarkSuite && runBenchmarkSuite(selectedBenchmarkSuite),
           },
           { label: "Open analytics", icon: Activity, run: () => setActiveView("analytics") },
           { label: "Open team workspace", icon: Users, run: () => setActiveView("team") },
@@ -2934,12 +3490,185 @@ export function PromptConsole() {
   );
 }
 
+function OperationsCommandCenter({
+  workspace,
+  selectedPrompt,
+  promptIntelligence,
+  onOpenBenchmarks,
+  onOpenAgents,
+  onOpenObservability,
+}: {
+  workspace: PromptWorkspace;
+  selectedPrompt?: ManagedPrompt;
+  promptIntelligence?: PromptWorkspace["promptIntelligence"][number];
+  onOpenBenchmarks: () => void;
+  onOpenAgents: () => void;
+  onOpenObservability: () => void;
+}) {
+  const totalCost = workspace.aiRuns.reduce(
+    (total, run) => total + run.estimatedCostUsd,
+    0,
+  );
+  const averageLatency = workspace.aiRuns.length
+    ? Math.round(
+        workspace.aiRuns.reduce((total, run) => total + run.latencyMs, 0) /
+          workspace.aiRuns.length,
+      )
+    : 0;
+  const errorRate = workspace.aiRuns.length
+    ? Math.round(
+        (workspace.aiRuns.filter((run) => run.status === "failed").length /
+          workspace.aiRuns.length) *
+          100,
+      )
+    : 0;
+  const topRuns = workspace.aiRuns
+    .slice()
+    .sort((a, b) => b.qualityScore - a.qualityScore)
+    .slice(0, 4);
+  const lifecycle = [
+    ["Prompt", workspace.prompts.length],
+    ["Version", workspace.versions.length],
+    ["Experiment", workspace.experiments.length + workspace.benchmarkSuites.length],
+    ["Evaluation", workspace.evaluations.length],
+    ["Workflow", workspace.aiWorkflows.length],
+    ["Deployment", workspace.deployments.length],
+    ["Observation", workspace.traceSessions.length],
+    ["Improvement", workspace.promptIntelligence.length],
+  ];
+  const searchCorpus = [
+    ...workspace.prompts.map((item) => ({ label: item.title, type: "Prompt" })),
+    ...workspace.aiWorkflows.map((item) => ({ label: item.name, type: "Workflow" })),
+    ...workspace.agents.map((item) => ({ label: item.name, type: "Agent" })),
+    ...workspace.benchmarkSuites.map((item) => ({ label: item.name, type: "Benchmark" })),
+    ...workspace.traceSessions.map((item) => ({ label: item.name, type: "Trace" })),
+  ].slice(0, 8);
+
+  return (
+    <section className="grid gap-5 border-b border-black/10 py-7 xl:grid-cols-[minmax(0,1.1fr)_0.9fr]">
+      <div className="rounded-lg border border-black/10 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
+              AI operations lifecycle
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-normal">
+              One execution model from prompt idea to production observation.
+            </h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-secondary" onClick={onOpenBenchmarks}>
+              <Gauge size={16} aria-hidden="true" />
+              Benchmarks
+            </button>
+            <button className="btn-secondary" onClick={onOpenAgents}>
+              <Bot size={16} aria-hidden="true" />
+              Agents
+            </button>
+            <button className="btn-secondary" onClick={onOpenObservability}>
+              <Activity size={16} aria-hidden="true" />
+              Traces
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-2 md:grid-cols-4">
+          {lifecycle.map(([label, count], index) => (
+            <div
+              key={label}
+              className="rounded-lg border border-black/10 bg-[#f7f8fb] p-3"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/40">
+                {index + 1}. {label}
+              </p>
+              <p className="mt-2 text-2xl font-semibold">{count}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 grid gap-3 md:grid-cols-4">
+          <CostMetric label="Spend" value={totalCost} />
+          <Metric label="Avg latency" value={averageLatency} suffix="ms" />
+          <Metric label="Error rate" value={errorRate} suffix="%" />
+          <Metric label="Traces" value={workspace.traceSessions.length} />
+        </div>
+      </div>
+
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-1">
+        <div className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+          <p className="text-sm font-semibold">Global search surface</p>
+          <div className="mt-3 space-y-2">
+            {searchCorpus.map((item) => (
+              <div
+                key={`${item.type}-${item.label}`}
+                className="flex items-center justify-between gap-3 rounded-lg border border-black/10 px-3 py-2 text-sm"
+              >
+                <span className="truncate font-medium">{item.label}</span>
+                <span className="rounded-md bg-black/[0.05] px-2 py-1 text-xs font-semibold">
+                  {item.type}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+          <p className="text-sm font-semibold">Prompt Health Score</p>
+          {promptIntelligence && selectedPrompt ? (
+            <div className="mt-3">
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-3xl font-semibold">{promptIntelligence.healthScore}</p>
+                  <p className="mt-1 text-sm text-black/55">{selectedPrompt.title}</p>
+                </div>
+                <span className="tag">{promptIntelligence.cluster}</span>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <ScoreBar label="Clarity" value={promptIntelligence.clarity} />
+                <ScoreBar label="Robustness" value={promptIntelligence.robustness} />
+              </div>
+              <ul className="mt-4 space-y-1 text-sm leading-6 text-black/65">
+                {promptIntelligence.suggestions.slice(0, 2).map((suggestion) => (
+                  <li key={suggestion}>- {suggestion}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="mt-3 text-sm leading-6 text-black/55">
+              Prompt intelligence will score clarity, robustness, duplicate risk,
+              hallucination risk, and model fit as prompts enter the lifecycle.
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-black/10 bg-white p-5 shadow-sm md:col-span-2 xl:col-span-1">
+          <p className="mb-3 text-sm font-semibold">Top performing AI runs</p>
+          <div className="space-y-2">
+            {topRuns.map((run) => (
+              <div key={run.id} className="grid grid-cols-[1fr_auto] gap-3 rounded-lg border border-black/10 p-3 text-sm">
+                <span className="font-medium capitalize">{run.entityType} · {run.model}</span>
+                <span className="rounded-full bg-black px-2 py-1 text-xs font-semibold text-white">
+                  {run.qualityScore}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ExperimentLab({
   experiments,
   experimentWorkflows,
   experimentRuns,
   datasets,
   presets,
+  benchmarkSuites,
+  benchmarkRuns,
+  benchmarkDatasets,
+  selectedBenchmarkSuite,
   selectedExperiment,
   selectedPrompt,
   evaluationModels,
@@ -2947,11 +3676,14 @@ function ExperimentLab({
   evaluationTab,
   evaluating,
   experimentRunning,
+  benchmarkRunning,
   testInput,
   onTestInputChange,
   onSelectExperiment,
+  onSelectBenchmarkSuite,
   onCreateExperiment,
   onRunExperiment,
+  onRunBenchmark,
   onRunEvaluation,
   onEvaluationTabChange,
   onToggleModel,
@@ -2961,6 +3693,10 @@ function ExperimentLab({
   experimentRuns: PromptWorkspace["experimentRuns"];
   datasets: PromptWorkspace["evaluationDatasets"];
   presets: PromptWorkspace["evaluationPresets"];
+  benchmarkSuites: PromptWorkspace["benchmarkSuites"];
+  benchmarkRuns: PromptWorkspace["benchmarkRuns"];
+  benchmarkDatasets: PromptWorkspace["benchmarkDatasets"];
+  selectedBenchmarkSuite?: PromptWorkspace["benchmarkSuites"][number];
   selectedExperiment?: PromptExperiment;
   selectedPrompt?: ManagedPrompt;
   evaluationModels: string[];
@@ -2968,11 +3704,14 @@ function ExperimentLab({
   evaluationTab: EvaluationTab;
   evaluating: boolean;
   experimentRunning: boolean;
+  benchmarkRunning: boolean;
   testInput: string;
   onTestInputChange: (value: string) => void;
   onSelectExperiment: (id: string) => void;
+  onSelectBenchmarkSuite: (id: string) => void;
   onCreateExperiment: () => void;
   onRunExperiment: (experiment: PromptExperiment) => void;
+  onRunBenchmark: (suite: PromptWorkspace["benchmarkSuites"][number]) => void;
   onRunEvaluation: () => void;
   onEvaluationTabChange: (tab: EvaluationTab) => void;
   onToggleModel: (modelId: string, checked: boolean) => void;
@@ -3003,6 +3742,19 @@ function ExperimentLab({
         ) / experimentRuns.length,
       )
     : 0;
+  const leaderboard = benchmarkRuns
+    .slice()
+    .sort(
+      (a, b) =>
+        b.accuracy +
+        b.consistencyScore -
+        b.hallucinationRate -
+        (a.accuracy + a.consistencyScore - a.hallucinationRate),
+    );
+  const regressionAlerts = benchmarkRuns.filter((run) => run.regressionDelta < 0);
+  const selectedBenchmarkRuns = selectedBenchmarkSuite
+    ? benchmarkRuns.filter((run) => run.suiteId === selectedBenchmarkSuite.id)
+    : benchmarkRuns;
 
   return (
     <section className="grid gap-8 py-8 xl:grid-cols-[340px_minmax(0,1fr)]">
@@ -3084,14 +3836,156 @@ function ExperimentLab({
       </aside>
 
       <div className="min-w-0 space-y-8">
+        <Panel title="AI Benchmarking Engine" icon={Gauge}>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="space-y-4">
+              <div className="rounded-lg border border-black/10 bg-white p-6">
+                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
+                  Unified experiments + evaluations
+                </p>
+                <h2 className="mt-3 text-3xl font-semibold tracking-normal">
+                  Rank prompts and models across datasets before release.
+                </h2>
+                <p className="mt-4 max-w-3xl text-sm leading-7 text-black/60">
+                  Benchmark suites run the same prompt versions across datasets and
+                  model adapters, detect regressions, score rubric quality, and update
+                  the leaderboard used by release gates.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {benchmarkSuites.map((suite) => (
+                    <button
+                      key={suite.id}
+                      className={clsx(
+                        "rounded-lg border px-3 py-2 text-sm font-semibold",
+                        selectedBenchmarkSuite?.id === suite.id
+                          ? "border-black bg-black text-white"
+                          : "border-black/10 bg-white text-black/65",
+                      )}
+                      onClick={() => onSelectBenchmarkSuite(suite.id)}
+                    >
+                      {suite.name}
+                    </button>
+                  ))}
+                </div>
+                {selectedBenchmarkSuite ? (
+                  <div className="mt-5 flex flex-wrap items-center gap-2">
+                    <button
+                      className="btn-primary"
+                      onClick={() => onRunBenchmark(selectedBenchmarkSuite)}
+                      disabled={benchmarkRunning}
+                    >
+                      {benchmarkRunning ? (
+                        <Loader2 className="animate-spin" size={16} aria-hidden="true" />
+                      ) : (
+                        <Gauge size={16} aria-hidden="true" />
+                      )}
+                      Run benchmark suite
+                    </button>
+                    <span className="tag">{selectedBenchmarkSuite.modelIds.length} models</span>
+                    <span className="tag">{selectedBenchmarkSuite.datasetIds.length} datasets</span>
+                    <span className="tag">{selectedBenchmarkSuite.metrics.length} metrics</span>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-lg border border-black/10 bg-white p-5">
+                  <p className="mb-4 text-sm font-semibold">Model performance heatmap</p>
+                  <div className="space-y-3">
+                    {selectedBenchmarkRuns.map((run) => (
+                      <div key={run.id}>
+                        <div className="mb-1 flex items-center justify-between text-xs font-semibold">
+                          <span>{run.model}</span>
+                          <span>{run.accuracy}% accuracy</span>
+                        </div>
+                        <div className="grid grid-cols-10 gap-1">
+                          {Array.from({ length: 10 }).map((_, index) => (
+                            <span
+                              key={`${run.id}-${index}`}
+                              className={clsx(
+                                "h-6 rounded",
+                                index < Math.round(run.accuracy / 10)
+                                  ? "bg-[#0f766e]"
+                                  : "bg-black/10",
+                              )}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-black/10 bg-white p-5">
+                  <p className="mb-4 text-sm font-semibold">Regression alerts</p>
+                  <div className="space-y-2">
+                    {regressionAlerts.map((run) => (
+                      <div key={run.id} className="rounded-lg border border-[#f59e0b]/30 bg-[#fffbeb] p-3">
+                        <p className="text-sm font-semibold">{run.model}</p>
+                        <p className="mt-1 text-xs text-black/55">
+                          {run.regressionDelta} point regression on {run.datasetId}
+                        </p>
+                      </div>
+                    ))}
+                    {!regressionAlerts.length ? (
+                      <p className="rounded-lg border border-dashed border-black/20 p-4 text-sm text-black/55">
+                        No benchmark regressions detected.
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="rounded-lg border border-black/10 bg-white p-5">
+                <p className="mb-4 text-sm font-semibold">Leaderboard</p>
+                <div className="space-y-2">
+                  {leaderboard.slice(0, 5).map((run, index) => (
+                    <div
+                      key={run.id}
+                      className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-black/10 p-3"
+                    >
+                      <span className="text-lg font-semibold">{index + 1}</span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{run.model}</p>
+                        <p className="text-xs text-black/50">
+                          {run.accuracy}% accuracy / {run.hallucinationRate}% hallucination
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-black px-2 py-1 text-xs font-semibold text-white">
+                        {run.consistencyScore}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-black/10 bg-white p-5">
+                <p className="mb-4 text-sm font-semibold">Benchmark datasets</p>
+                <div className="space-y-3">
+                  {benchmarkDatasets.map((dataset) => (
+                    <div key={dataset.id} className="rounded-lg border border-black/10 p-3">
+                      <p className="text-sm font-semibold">{dataset.name}</p>
+                      <p className="mt-1 text-xs text-black/55">
+                        {dataset.taskType} · {dataset.examples.length} examples
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Panel>
+
         <section className="rounded-lg border border-black/10 bg-white p-6 shadow-sm sm:p-8">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
-                LLM experimentation suite
+                AI benchmarking suite
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-normal sm:text-4xl">
-                Compare prompt variants before they become production workflows.
+                Merge experiments and evaluations into production benchmark gates.
               </h2>
               <p className="mt-4 max-w-3xl text-base leading-8 text-black/60">
                 Run A/B prompt variants across model adapters, inspect cost and latency,
@@ -3401,6 +4295,224 @@ function ExperimentResultCard({ result }: { result: PromptExperimentResult }) {
   );
 }
 
+function AgentOperationsPanel({
+  agents,
+  agentRuns,
+  agentMemory,
+  agentTools,
+  selectedAgent,
+  selectedRun,
+  running,
+  onSelectAgent,
+  onRunAgent,
+}: {
+  agents: PromptWorkspace["agents"];
+  agentRuns: PromptWorkspace["agentRuns"];
+  agentMemory: PromptWorkspace["agentMemory"];
+  agentTools: PromptWorkspace["agentTools"];
+  selectedAgent?: PromptWorkspace["agents"][number];
+  selectedRun?: PromptWorkspace["agentRuns"][number];
+  running: boolean;
+  onSelectAgent: (id: string) => void;
+  onRunAgent: (agent: PromptWorkspace["agents"][number]) => void;
+}) {
+  const visibleTools = selectedAgent
+    ? agentTools.filter((tool) => tool.agentId === selectedAgent.id)
+    : agentTools;
+  const visibleMemory = selectedAgent
+    ? agentMemory.filter((memory) => memory.agentId === selectedAgent.id)
+    : agentMemory;
+  const visibleRuns = selectedAgent
+    ? agentRuns.filter((run) => run.agentId === selectedAgent.id)
+    : agentRuns;
+
+  return (
+    <section className="grid gap-6 py-8 xl:grid-cols-[340px_minmax(0,1fr)]">
+      <aside className="space-y-5">
+        <Panel title="Agent Registry" icon={Bot}>
+          <div className="space-y-3">
+            {agents.map((agent) => (
+              <button
+                key={agent.id}
+                className={clsx(
+                  "block w-full rounded-lg border p-4 text-left transition",
+                  selectedAgent?.id === agent.id
+                    ? "border-black bg-white shadow-sm"
+                    : "border-black/10 bg-white/70 hover:bg-white",
+                )}
+                onClick={() => onSelectAgent(agent.id)}
+              >
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f766e]">
+                  {agent.type}
+                </span>
+                <p className="mt-2 text-base font-semibold">{agent.name}</p>
+                <p className="mt-2 line-clamp-3 text-sm leading-6 text-black/60">
+                  {agent.description}
+                </p>
+              </button>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="Agent Memory" icon={Brain}>
+          <div className="space-y-3">
+            {visibleMemory.map((memory) => (
+              <div key={memory.id} className="rounded-lg border border-black/10 bg-white p-4">
+                <p className="text-sm font-semibold">{memory.key}</p>
+                <p className="mt-2 text-sm leading-6 text-black/60">{memory.value}</p>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </aside>
+
+      <div className="min-w-0 space-y-6">
+        <section className="rounded-lg border border-black/10 bg-white p-6 shadow-sm sm:p-8">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
+                Agent builder canvas
+              </p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-normal">
+                Build agents that reason, invoke tools, branch, and remember.
+              </h2>
+              <p className="mt-4 max-w-3xl text-base leading-8 text-black/60">
+                Agents are first-class AI operations entities. Each run writes to
+                the unified run log, creates trace steps, persists memory, and can
+                be chained into workflows or benchmarks.
+              </p>
+            </div>
+            <dl className="grid grid-cols-2 gap-3">
+              <Metric label="Agents" value={agents.length} />
+              <Metric label="Runs" value={agentRuns.length} />
+              <Metric label="Tools" value={visibleTools.length} />
+              <Metric label="Memory" value={visibleMemory.length} />
+            </dl>
+          </div>
+        </section>
+
+        {selectedAgent ? (
+          <Panel title={selectedAgent.name} icon={Bot}>
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="rounded-lg border border-black/10 bg-white p-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f766e]">
+                      {selectedAgent.status} {selectedAgent.type}
+                    </p>
+                    <h3 className="mt-2 text-2xl font-semibold">{selectedAgent.name}</h3>
+                    <p className="mt-3 max-w-2xl text-sm leading-7 text-black/60">
+                      {selectedAgent.description}
+                    </p>
+                  </div>
+                  <button
+                    className="btn-primary"
+                    onClick={() => onRunAgent(selectedAgent)}
+                    disabled={running}
+                  >
+                    {running ? (
+                      <Loader2 className="animate-spin" size={16} aria-hidden="true" />
+                    ) : (
+                      <Sparkles size={16} aria-hidden="true" />
+                    )}
+                    Run agent
+                  </button>
+                </div>
+
+                <div className="mt-6 min-h-56 overflow-auto rounded-lg border border-black/10 bg-[#f7f8fb] p-5">
+                  <div className="flex min-w-[720px] items-center gap-4">
+                    {[
+                      ["Objective", "Reason about task"],
+                      ["Memory", selectedAgent.memoryKeys.join(", ")],
+                      ["Tools", selectedAgent.tools.join(", ")],
+                      ["Branch", "Decide next action"],
+                      ["Artifact", "Persist output"],
+                    ].map(([label, detail], index) => (
+                      <div
+                        key={label}
+                        draggable
+                        className="w-40 shrink-0 rounded-lg border border-black/10 bg-white p-4 shadow-sm"
+                      >
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/45">
+                          Step {index + 1}
+                        </p>
+                        <p className="mt-2 text-sm font-semibold">{label}</p>
+                        <p className="mt-2 line-clamp-3 text-xs leading-5 text-black/55">
+                          {detail}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-lg border border-black/10 bg-white p-5">
+                  <p className="mb-3 text-sm font-semibold">Tool call inspector</p>
+                  <div className="space-y-2">
+                    {visibleTools.map((tool) => (
+                      <div key={tool.id} className="rounded-lg border border-black/10 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold">{tool.name}</p>
+                          <span className="tag">{tool.status}</span>
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-black/55">
+                          {tool.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-black/10 bg-white p-5">
+                  <p className="mb-3 text-sm font-semibold">Recent agent runs</p>
+                  <div className="space-y-2">
+                    {visibleRuns.map((run) => (
+                      <div key={run.id} className="rounded-lg border border-black/10 p-3">
+                        <p className="text-sm font-semibold">{run.status}</p>
+                        <p className="mt-1 text-xs text-black/50">
+                          {run.latencyMs}ms · {run.tokenEstimate} tokens · {formatCost(run.estimatedCostUsd)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {selectedRun ? (
+              <div className="mt-6 rounded-lg border border-black/10 bg-white p-5">
+                <p className="mb-4 text-sm font-semibold">Execution trace viewer</p>
+                <div className="space-y-3">
+                  {selectedRun.steps.map((step, index) => (
+                    <div
+                      key={step.id}
+                      className="grid gap-3 rounded-lg border border-black/10 p-4 md:grid-cols-[48px_minmax(0,1fr)_160px]"
+                    >
+                      <span className="grid size-9 place-items-center rounded-full bg-black text-sm font-semibold text-white">
+                        {index + 1}
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold">{step.label}</p>
+                        <p className="mt-1 text-sm leading-6 text-black/60">{step.detail}</p>
+                      </div>
+                      <div className="text-xs text-black/55">
+                        <p>{step.kind}</p>
+                        <p>{step.latencyMs}ms</p>
+                        <p>{step.tokenEstimate} tokens</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </Panel>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 function WorkflowStudio({
   workflows,
   selectedWorkflow,
@@ -3476,16 +4588,32 @@ function WorkflowStudio({
       <div className="space-y-8">
         <section className="rounded-lg border border-black/10 bg-white p-6 shadow-sm sm:p-8">
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
-            AI workflow pipeline
+            Workflow Engine v2
           </p>
           <h2 className="mt-3 text-3xl font-semibold tracking-normal sm:text-4xl">
-            Chain prompts, conditions, variables, and outputs into repeatable AI operations.
+            Stateful workflow execution with branches, loops, retries, and replay.
           </h2>
           <p className="mt-4 max-w-3xl text-base leading-8 text-black/60">
             Build production workflows for research, support automation, SEO,
-            content generation, and evaluation-driven deployment gates.
+            content generation, and evaluation-driven deployment gates with
+            dataset execution, node caching, partial re-runs, and failure recovery.
           </p>
         </section>
+
+        <div className="grid gap-3 md:grid-cols-5">
+          {[
+            ["If/else", "Conditional branching"],
+            ["Loop", "Batch datasets"],
+            ["Parallel", "Model fan-out"],
+            ["Retry", "Fallback strategy"],
+            ["Replay", "Debug from trace"],
+          ].map(([label, detail]) => (
+            <div key={label} className="rounded-lg border border-black/10 bg-white p-4">
+              <p className="text-sm font-semibold">{label}</p>
+              <p className="mt-1 text-xs leading-5 text-black/55">{detail}</p>
+            </div>
+          ))}
+        </div>
 
         {selectedWorkflow ? (
           <Panel title={selectedWorkflow.name} icon={Workflow}>
@@ -3582,6 +4710,7 @@ function DeploymentCenter({
   versions,
   deployments,
   history,
+  releases,
   environment,
   onEnvironmentChange,
   onDeploy,
@@ -3592,6 +4721,7 @@ function DeploymentCenter({
   versions: PromptVersion[];
   deployments: PromptDeployment[];
   history: PromptWorkspace["deploymentHistory"];
+  releases: PromptWorkspace["promptReleases"];
   environment: DeploymentEnvironment;
   onEnvironmentChange: (environment: DeploymentEnvironment) => void;
   onDeploy: (environment: DeploymentEnvironment) => void;
@@ -3600,21 +4730,28 @@ function DeploymentCenter({
 }) {
   const promptById = new Map(prompts.map((prompt) => [prompt.id, prompt]));
   const versionById = new Map(versions.map((version) => [version.id, version]));
+  const environmentReleases = releases.filter((release) => release.environment === environment);
+  const averageHealth = environmentReleases.length
+    ? Math.round(
+        environmentReleases.reduce((total, release) => total + release.healthScore, 0) /
+          environmentReleases.length,
+      )
+    : 0;
 
   return (
     <section className="space-y-8 py-8">
       <section className="rounded-lg border border-black/10 bg-white p-6 shadow-sm sm:p-8">
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
-          Prompt deployment lifecycle
+          Release management lifecycle
         </p>
         <div className="mt-3 grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
           <div>
             <h2 className="text-3xl font-semibold tracking-normal sm:text-4xl">
-              Promote prompt versions through Development, Staging, and Production.
+              Ship prompt releases with staged rollout, A/B checks, and rollback.
             </h2>
             <p className="mt-4 max-w-3xl text-base leading-8 text-black/60">
-              Track deployment metadata, rollback checkpoints, promotion events,
-              and environment history with a production-style release flow.
+              Track release notes, deployment health, performance comparison,
+              promotion events, rollout percentage, and rollback checkpoints.
             </p>
           </div>
           <div className="grid gap-2">
@@ -3641,6 +4778,52 @@ function DeploymentCenter({
           </div>
         </div>
       </section>
+
+      <Panel title="Deployment Health Dashboard" icon={Gauge}>
+        <div className="grid gap-3 md:grid-cols-4">
+          <Metric label="Release health" value={averageHealth} suffix="/100" />
+          <Metric label="Active releases" value={environmentReleases.length} />
+          <Metric
+            label="A/B rollout"
+            value={environmentReleases.reduce(
+              (max, release) => Math.max(max, release.rolloutPercent),
+              0,
+            )}
+            suffix="%"
+          />
+          <Metric
+            label="Rollbacks"
+            value={environmentReleases.filter((release) => release.status === "rolled_back").length}
+          />
+        </div>
+        <div className="mt-5 grid gap-3 lg:grid-cols-2">
+          {environmentReleases.map((release) => (
+            <article key={release.id} className="rounded-lg border border-black/10 bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">{release.tag}</p>
+                  <p className="mt-1 text-xs text-black/50">{release.notes}</p>
+                </div>
+                <span className="tag">{release.status}</span>
+              </div>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-black/10">
+                <div
+                  className="h-full rounded-full bg-[#0f766e]"
+                  style={{ width: `${release.rolloutPercent}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-black/50">
+                {release.rolloutPercent}% rollout · health {release.healthScore}
+              </p>
+            </article>
+          ))}
+          {!environmentReleases.length ? (
+            <div className="rounded-lg border border-dashed border-black/20 bg-white p-6 text-sm text-black/55">
+              No release records for this environment yet.
+            </div>
+          ) : null}
+        </div>
+      </Panel>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <Panel title={`${environment} deployments`} icon={Rocket}>
@@ -3710,6 +4893,204 @@ function DeploymentCenter({
             ))}
           </div>
         </Panel>
+      </div>
+    </section>
+  );
+}
+
+function ObservabilityCenter({
+  runs,
+  artifacts,
+  metrics,
+  traces,
+  steps,
+  logs,
+  selectedTrace,
+  onSelectTrace,
+}: {
+  runs: PromptWorkspace["aiRuns"];
+  artifacts: PromptWorkspace["aiArtifacts"];
+  metrics: PromptWorkspace["aiMetrics"];
+  traces: PromptWorkspace["traceSessions"];
+  steps: PromptWorkspace["traceSteps"];
+  logs: PromptWorkspace["traceLogs"];
+  selectedTrace?: PromptWorkspace["traceSessions"][number];
+  onSelectTrace: (id: string) => void;
+}) {
+  const traceSteps = selectedTrace
+    ? steps.filter((step) => step.traceId === selectedTrace.id)
+    : [];
+  const traceLogs = selectedTrace
+    ? logs.filter((log) => log.traceId === selectedTrace.id)
+    : [];
+  const selectedRun = selectedTrace
+    ? runs.find((run) => run.id === selectedTrace.rootRunId)
+    : undefined;
+  const runArtifacts = selectedRun
+    ? artifacts.filter((artifact) => artifact.runId === selectedRun.id)
+    : [];
+  const metricSeries = metrics.slice(0, 10).map((metric) => ({
+    name: metric.name,
+    value: metric.value,
+  }));
+
+  return (
+    <section className="grid gap-6 py-8 xl:grid-cols-[360px_minmax(0,1fr)]">
+      <aside className="space-y-5">
+        <Panel title="Trace Sessions" icon={Activity}>
+          <div className="space-y-3">
+            {traces.map((trace) => (
+              <button
+                key={trace.id}
+                className={clsx(
+                  "block w-full rounded-lg border p-4 text-left transition",
+                  selectedTrace?.id === trace.id
+                    ? "border-black bg-white shadow-sm"
+                    : "border-black/10 bg-white/70 hover:bg-white",
+                )}
+                onClick={() => onSelectTrace(trace.id)}
+              >
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f766e]">
+                  {trace.entityType} · {trace.status}
+                </span>
+                <p className="mt-2 text-sm font-semibold">{trace.name}</p>
+                <p className="mt-1 text-xs text-black/50">
+                  {trace.totalLatencyMs}ms · {formatCost(trace.totalCostUsd)}
+                </p>
+              </button>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="Unified AI Runs" icon={ServerCog}>
+          <div className="space-y-2">
+            {runs.slice(0, 8).map((run) => (
+              <div key={run.id} className="rounded-lg border border-black/10 bg-white p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold capitalize">{run.entityType}</p>
+                  <span className="tag">{run.status}</span>
+                </div>
+                <p className="mt-1 text-xs text-black/50">
+                  {run.model} · {run.latencyMs}ms · {formatCost(run.estimatedCostUsd)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </aside>
+
+      <div className="min-w-0 space-y-6">
+        <section className="rounded-lg border border-black/10 bg-white p-6 shadow-sm sm:p-8">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
+                Event-driven observability
+              </p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-normal">
+                Trace every prompt, workflow, benchmark, deployment, and agent run.
+              </h2>
+              <p className="mt-4 max-w-3xl text-base leading-8 text-black/60">
+                The trace tree shows nested steps, error context, token usage,
+                latency per node, cost breakdown, artifacts, and logs from a
+                single AI operations execution model.
+              </p>
+            </div>
+            <dl className="grid grid-cols-2 gap-3">
+              <Metric label="Runs" value={runs.length} />
+              <Metric label="Traces" value={traces.length} />
+              <Metric label="Artifacts" value={artifacts.length} />
+              <Metric label="Metrics" value={metrics.length} />
+            </dl>
+          </div>
+        </section>
+
+        {selectedTrace ? (
+          <Panel title={selectedTrace.name} icon={Activity}>
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+              <div className="space-y-3">
+                {traceSteps.map((step) => (
+                  <div
+                    key={step.id}
+                    className="rounded-lg border border-black/10 bg-white p-4"
+                    style={{ marginLeft: `${step.depth * 18}px` }}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">{step.label}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.12em] text-black/45">
+                          {step.kind} · {step.status}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-black px-2 py-1 text-xs font-semibold text-white">
+                        {step.latencyMs}ms
+                      </span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                      <Info label="Tokens" value={`${step.tokenEstimate}`} />
+                      <Info label="Cost" value={formatCost(step.estimatedCostUsd)} />
+                      <Info label="Depth" value={`${step.depth}`} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-lg border border-black/10 bg-white p-5">
+                  <p className="mb-3 text-sm font-semibold">Step inspector</p>
+                  <Info label="Root run" value={selectedTrace.rootRunId} />
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <Info label="Latency" value={`${selectedTrace.totalLatencyMs}ms`} />
+                    <Info label="Cost" value={formatCost(selectedTrace.totalCostUsd)} />
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-black/10 bg-white p-5">
+                  <p className="mb-3 text-sm font-semibold">Artifacts</p>
+                  <div className="space-y-2">
+                    {runArtifacts.map((artifact) => (
+                      <div key={artifact.id} className="rounded-lg border border-black/10 p-3">
+                        <p className="text-sm font-semibold">{artifact.title}</p>
+                        <p className="mt-1 line-clamp-3 text-xs leading-5 text-black/55">
+                          {artifact.content}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-black/10 bg-white p-5">
+                  <p className="mb-3 text-sm font-semibold">Trace logs</p>
+                  <div className="space-y-2">
+                    {traceLogs.map((log) => (
+                      <div key={log.id} className="rounded-lg border border-black/10 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/45">
+                          {log.level}
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-black/65">{log.message}</p>
+                      </div>
+                    ))}
+                    {!traceLogs.length ? (
+                      <p className="text-sm text-black/55">No trace logs for this session.</p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 h-72 rounded-lg border border-black/10 bg-white p-4">
+              <p className="mb-3 text-sm font-semibold">Performance breakdown</p>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={metricSeries}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                  <YAxis tickLine={false} axisLine={false} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#0f766e" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Panel>
+        ) : null}
       </div>
     </section>
   );
@@ -3829,7 +5210,7 @@ function AnalyticsDashboard({
 }) {
   return (
     <section className="grid gap-4 pb-6 xl:grid-cols-[1.2fr_0.8fr]">
-      <Panel title="PromptOps Analytics" icon={BarChart3}>
+      <Panel title="Global AI Operations Dashboard" icon={BarChart3}>
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="grid gap-3 lg:col-span-2 lg:grid-cols-3">
             <div className="rounded-lg border border-black/10 bg-white p-4">
@@ -4070,7 +5451,7 @@ function CommandPalette({
             <div className="border-b border-black/10 p-4">
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <Command size={16} aria-hidden="true" />
-                PromptOps command palette
+                AI operations command center
               </div>
             </div>
             <div className="p-2">

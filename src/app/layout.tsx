@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PromptDeck AI v2.0 — AI Workflow Operating System",
+  title: "PromptDeck AI v3.0 — AI Operations Platform",
   description:
-    "A production-minded AI workflow operating system for LLMOps experiments, evaluations, deployments, workflows, analytics, and Supabase-ready security.",
+    "A production-minded AI operations platform for LLMOps agents, benchmarks, traces, releases, workflows, analytics, and Supabase-ready security.",
 };
 
 export default function RootLayout({

@@ -160,7 +160,14 @@ export type DeploymentHistory = {
   createdAt: string;
 };
 
-export type WorkflowNodeKind = "prompt" | "variable" | "condition" | "output";
+export type WorkflowNodeKind =
+  | "prompt"
+  | "variable"
+  | "condition"
+  | "loop"
+  | "parallel"
+  | "retry"
+  | "output";
 
 export type AIWorkflowNode = {
   id: string;
@@ -234,6 +241,228 @@ export type AuditLog = {
   createdAt: string;
 };
 
+export type AIRunKind =
+  | "prompt"
+  | "evaluation"
+  | "experiment"
+  | "workflow"
+  | "deployment"
+  | "agent"
+  | "benchmark";
+
+export type AIRunStatus = "queued" | "running" | "completed" | "failed";
+
+export type AIRun = {
+  id: string;
+  workspaceId: string;
+  entityType: AIRunKind;
+  entityId: string;
+  traceId: string;
+  status: AIRunStatus;
+  model: string;
+  provider: "openai" | "anthropic" | "google" | "demo" | "system";
+  latencyMs: number;
+  inputTokenEstimate: number;
+  outputTokenEstimate: number;
+  estimatedCostUsd: number;
+  qualityScore: number;
+  startedAt: string;
+  completedAt: string | null;
+  parentRunId: string | null;
+};
+
+export type AIArtifact = {
+  id: string;
+  runId: string;
+  workspaceId: string;
+  kind: "prompt_output" | "workflow_output" | "agent_memory" | "benchmark_report" | "release_note";
+  title: string;
+  content: string;
+  version: number;
+  createdAt: string;
+};
+
+export type AIMetric = {
+  id: string;
+  runId: string;
+  workspaceId: string;
+  scope: AIRunKind | "system";
+  name: string;
+  value: number;
+  unit: "score" | "ms" | "tokens" | "usd" | "percent" | "count";
+  createdAt: string;
+};
+
+export type AgentType =
+  | "research"
+  | "support"
+  | "coding"
+  | "data-extraction"
+  | "evaluation";
+
+export type Agent = {
+  id: string;
+  workspaceId: string;
+  name: string;
+  type: AgentType;
+  description: string;
+  tools: string[];
+  memoryKeys: string[];
+  status: "draft" | "active" | "paused";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AgentRunStep = {
+  id: string;
+  label: string;
+  kind: "reasoning" | "tool_call" | "memory_read" | "branch" | "final";
+  status: AIRunStatus;
+  detail: string;
+  latencyMs: number;
+  tokenEstimate: number;
+};
+
+export type AgentRun = {
+  id: string;
+  agentId: string;
+  traceId: string;
+  objective: string;
+  status: AIRunStatus;
+  steps: AgentRunStep[];
+  latencyMs: number;
+  tokenEstimate: number;
+  estimatedCostUsd: number;
+  createdAt: string;
+};
+
+export type AgentMemory = {
+  id: string;
+  agentId: string;
+  key: string;
+  value: string;
+  updatedAt: string;
+};
+
+export type AgentTool = {
+  id: string;
+  agentId: string;
+  name: string;
+  kind: "search" | "database" | "code" | "ticketing" | "http" | "evaluation";
+  description: string;
+  status: "mock" | "connected";
+};
+
+export type BenchmarkSuite = {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string;
+  promptIds: string[];
+  modelIds: string[];
+  datasetIds: string[];
+  metrics: string[];
+  status: "draft" | "running" | "completed" | "archived";
+  createdAt: string;
+};
+
+export type BenchmarkDataset = {
+  id: string;
+  name: string;
+  taskType: string;
+  examples: { input: string; expected: string; difficulty: "easy" | "medium" | "hard" }[];
+  createdAt: string;
+};
+
+export type BenchmarkRun = {
+  id: string;
+  suiteId: string;
+  promptId: string;
+  model: string;
+  datasetId: string;
+  status: AIRunStatus;
+  accuracy: number;
+  hallucinationRate: number;
+  latencyMs: number;
+  estimatedCostUsd: number;
+  consistencyScore: number;
+  regressionDelta: number;
+  createdAt: string;
+};
+
+export type BenchmarkScore = {
+  id: string;
+  runId: string;
+  metric: string;
+  value: number;
+  createdAt: string;
+};
+
+export type TraceSession = {
+  id: string;
+  rootRunId: string;
+  workspaceId: string;
+  entityType: AIRunKind;
+  entityId: string;
+  name: string;
+  status: AIRunStatus;
+  startedAt: string;
+  endedAt: string | null;
+  totalLatencyMs: number;
+  totalCostUsd: number;
+};
+
+export type TraceStep = {
+  id: string;
+  traceId: string;
+  parentStepId: string | null;
+  label: string;
+  kind: "prompt" | "model" | "tool" | "condition" | "loop" | "parallel" | "artifact" | "release";
+  status: AIRunStatus;
+  latencyMs: number;
+  tokenEstimate: number;
+  estimatedCostUsd: number;
+  startedAt: string;
+  endedAt: string | null;
+  depth: number;
+};
+
+export type TraceLog = {
+  id: string;
+  traceId: string;
+  stepId: string | null;
+  level: "info" | "warning" | "error";
+  message: string;
+  createdAt: string;
+};
+
+export type PromptIntelligence = {
+  id: string;
+  promptId: string;
+  healthScore: number;
+  clarity: number;
+  robustness: number;
+  hallucinationRisk: number;
+  duplicateRisk: number;
+  cluster: string;
+  suggestions: string[];
+  modelRecommendation: string;
+  updatedAt: string;
+};
+
+export type PromptRelease = {
+  id: string;
+  deploymentId: string;
+  versionId: string;
+  tag: string;
+  environment: DeploymentEnvironment;
+  status: "healthy" | "watching" | "degraded" | "rolled_back";
+  rolloutPercent: number;
+  healthScore: number;
+  notes: string;
+  createdAt: string;
+};
+
 export type PromptActivity = {
   id: string;
   promptId: string | null;
@@ -285,6 +514,22 @@ export type PromptWorkspace = {
   evaluationPresets: EvaluationPreset[];
   organizations: Organization[];
   auditLogs: AuditLog[];
+  aiRuns: AIRun[];
+  aiArtifacts: AIArtifact[];
+  aiMetrics: AIMetric[];
+  agents: Agent[];
+  agentRuns: AgentRun[];
+  agentMemory: AgentMemory[];
+  agentTools: AgentTool[];
+  benchmarkSuites: BenchmarkSuite[];
+  benchmarkDatasets: BenchmarkDataset[];
+  benchmarkRuns: BenchmarkRun[];
+  benchmarkScores: BenchmarkScore[];
+  traceSessions: TraceSession[];
+  traceSteps: TraceStep[];
+  traceLogs: TraceLog[];
+  promptIntelligence: PromptIntelligence[];
+  promptReleases: PromptRelease[];
   activities: PromptActivity[];
   workspaces: PromptOpsWorkspace[];
   collections: SharedCollection[];
@@ -669,11 +914,38 @@ export const seedWorkspace: PromptWorkspace = {
           config: "Continue when evidence confidence >= 80.",
         },
         {
+          id: "node-loop",
+          kind: "loop",
+          label: "Dataset loop",
+          promptId: null,
+          x: 640,
+          y: 190,
+          config: "Batch process evaluation examples with node-level cache.",
+        },
+        {
+          id: "node-parallel",
+          kind: "parallel",
+          label: "Parallel model check",
+          promptId: null,
+          x: 760,
+          y: 190,
+          config: "Run GPT, Claude, and Gemini adapters in parallel.",
+        },
+        {
+          id: "node-retry",
+          kind: "retry",
+          label: "Fallback retry",
+          promptId: null,
+          x: 880,
+          y: 190,
+          config: "Retry once, then fall back to the cheapest passing provider.",
+        },
+        {
           id: "node-output",
           kind: "output",
           label: "Executive brief",
           promptId: "prompt-prd",
-          x: 760,
+          x: 1000,
           y: 70,
           config: "Return final decision brief.",
         },
@@ -681,7 +953,10 @@ export const seedWorkspace: PromptWorkspace = {
       edges: [
         { id: "edge-1", from: "node-variable", to: "node-research", label: "context" },
         { id: "edge-2", from: "node-research", to: "node-condition", label: "score" },
-        { id: "edge-3", from: "node-condition", to: "node-output", label: "approved" },
+        { id: "edge-3", from: "node-condition", to: "node-loop", label: "approved" },
+        { id: "edge-4", from: "node-loop", to: "node-parallel", label: "batch" },
+        { id: "edge-5", from: "node-parallel", to: "node-retry", label: "fallback" },
+        { id: "edge-6", from: "node-retry", to: "node-output", label: "release gate" },
       ],
       status: "active",
       createdAt: "2026-05-15T10:18:00.000Z",
@@ -764,6 +1039,630 @@ export const seedWorkspace: PromptWorkspace = {
       createdAt: "2026-05-15T10:25:00.000Z",
     },
   ],
+  aiRuns: [
+    {
+      id: "ai-run-prd-eval",
+      workspaceId: "workspace-promptops",
+      entityType: "evaluation",
+      entityId: "eval-prd-gpt",
+      traceId: "trace-prd-eval",
+      status: "completed",
+      model: "gpt-5",
+      provider: "demo",
+      latencyMs: 420,
+      inputTokenEstimate: 128,
+      outputTokenEstimate: 50,
+      estimatedCostUsd: 0.00066,
+      qualityScore: 86,
+      startedAt: "2026-05-15T09:30:00.000Z",
+      completedAt: "2026-05-15T09:30:00.420Z",
+      parentRunId: null,
+    },
+    {
+      id: "ai-run-workflow-research",
+      workspaceId: "workspace-promptops",
+      entityType: "workflow",
+      entityId: "workflow-run-research-1",
+      traceId: "trace-workflow-research",
+      status: "completed",
+      model: "multi-model",
+      provider: "demo",
+      latencyMs: 1280,
+      inputTokenEstimate: 420,
+      outputTokenEstimate: 404,
+      estimatedCostUsd: 0.00492,
+      qualityScore: 90,
+      startedAt: "2026-05-15T10:25:00.000Z",
+      completedAt: "2026-05-15T10:25:01.280Z",
+      parentRunId: null,
+    },
+    {
+      id: "ai-run-agent-research",
+      workspaceId: "workspace-promptops",
+      entityType: "agent",
+      entityId: "agent-run-research-1",
+      traceId: "trace-agent-research",
+      status: "completed",
+      model: "gpt-5",
+      provider: "demo",
+      latencyMs: 2140,
+      inputTokenEstimate: 940,
+      outputTokenEstimate: 620,
+      estimatedCostUsd: 0.00948,
+      qualityScore: 92,
+      startedAt: "2026-05-15T11:05:00.000Z",
+      completedAt: "2026-05-15T11:05:02.140Z",
+      parentRunId: null,
+    },
+    {
+      id: "ai-run-benchmark-prd",
+      workspaceId: "workspace-promptops",
+      entityType: "benchmark",
+      entityId: "benchmark-run-prd-gpt",
+      traceId: "trace-benchmark-prd",
+      status: "completed",
+      model: "gpt-5",
+      provider: "demo",
+      latencyMs: 445,
+      inputTokenEstimate: 156,
+      outputTokenEstimate: 92,
+      estimatedCostUsd: 0.001115,
+      qualityScore: 91,
+      startedAt: "2026-05-15T11:20:00.000Z",
+      completedAt: "2026-05-15T11:20:00.445Z",
+      parentRunId: null,
+    },
+  ],
+  aiArtifacts: [
+    {
+      id: "artifact-prd-eval-output",
+      runId: "ai-run-prd-eval",
+      workspaceId: "workspace-promptops",
+      kind: "prompt_output",
+      title: "Product brief evaluation output",
+      content: "Structured PRD output with evidence boundaries and measurable launch scope.",
+      version: 1,
+      createdAt: "2026-05-15T09:30:00.420Z",
+    },
+    {
+      id: "artifact-workflow-brief",
+      runId: "ai-run-workflow-research",
+      workspaceId: "workspace-promptops",
+      kind: "workflow_output",
+      title: "Research brief pipeline artifact",
+      content: "Executive decision brief generated after research, confidence gate, and packaging steps.",
+      version: 1,
+      createdAt: "2026-05-15T10:25:01.280Z",
+    },
+    {
+      id: "artifact-agent-memory",
+      runId: "ai-run-agent-research",
+      workspaceId: "workspace-promptops",
+      kind: "agent_memory",
+      title: "Research agent memory update",
+      content: "Prefers evidence tables, confidence scores, and contradiction checks for market research tasks.",
+      version: 2,
+      createdAt: "2026-05-15T11:05:02.140Z",
+    },
+  ],
+  aiMetrics: [
+    {
+      id: "metric-cost-system",
+      runId: "ai-run-workflow-research",
+      workspaceId: "workspace-promptops",
+      scope: "system",
+      name: "estimated spend",
+      value: 0.016175,
+      unit: "usd",
+      createdAt: "2026-05-15T11:30:00.000Z",
+    },
+    {
+      id: "metric-latency-agent",
+      runId: "ai-run-agent-research",
+      workspaceId: "workspace-promptops",
+      scope: "agent",
+      name: "agent latency",
+      value: 2140,
+      unit: "ms",
+      createdAt: "2026-05-15T11:05:02.140Z",
+    },
+    {
+      id: "metric-quality-benchmark",
+      runId: "ai-run-benchmark-prd",
+      workspaceId: "workspace-promptops",
+      scope: "benchmark",
+      name: "benchmark score",
+      value: 91,
+      unit: "score",
+      createdAt: "2026-05-15T11:20:00.445Z",
+    },
+  ],
+  agents: [
+    {
+      id: "agent-research",
+      workspaceId: "workspace-promptops",
+      name: "Research Agent",
+      type: "research",
+      description:
+        "Plans market scans, separates evidence from inference, and writes decision briefs.",
+      tools: ["web-scout", "dataset-reader", "rubric-scorer"],
+      memoryKeys: ["preferred_citation_style", "risk_language", "decision_template"],
+      status: "active",
+      createdAt: "2026-05-15T10:50:00.000Z",
+      updatedAt: "2026-05-15T11:05:00.000Z",
+    },
+    {
+      id: "agent-support",
+      workspaceId: "workspace-promptops",
+      name: "Support Agent",
+      type: "support",
+      description:
+        "Classifies tickets, retrieves policy snippets, and drafts customer-safe replies.",
+      tools: ["ticket-search", "policy-rag", "sentiment-check"],
+      memoryKeys: ["refund_policy", "tone_guardrails"],
+      status: "active",
+      createdAt: "2026-05-15T10:52:00.000Z",
+      updatedAt: "2026-05-15T10:52:00.000Z",
+    },
+    {
+      id: "agent-evaluator",
+      workspaceId: "workspace-promptops",
+      name: "Evaluation Agent",
+      type: "evaluation",
+      description:
+        "Scores benchmark outputs, detects regressions, and writes evaluation summaries.",
+      tools: ["rubric-scorer", "regression-detector", "leaderboard-writer"],
+      memoryKeys: ["score_calibration", "risk_thresholds"],
+      status: "active",
+      createdAt: "2026-05-15T10:54:00.000Z",
+      updatedAt: "2026-05-15T10:54:00.000Z",
+    },
+  ],
+  agentRuns: [
+    {
+      id: "agent-run-research-1",
+      agentId: "agent-research",
+      traceId: "trace-agent-research",
+      objective: "Synthesize competitor signals for a recruiter-facing PromptDeck AI launch memo.",
+      status: "completed",
+      latencyMs: 2140,
+      tokenEstimate: 1560,
+      estimatedCostUsd: 0.00948,
+      createdAt: "2026-05-15T11:05:00.000Z",
+      steps: [
+        {
+          id: "agent-step-plan",
+          label: "Plan evidence scan",
+          kind: "reasoning",
+          status: "completed",
+          detail: "Chose market signals, product positioning, and benchmark proof points.",
+          latencyMs: 320,
+          tokenEstimate: 180,
+        },
+        {
+          id: "agent-step-tool",
+          label: "Invoke dataset reader",
+          kind: "tool_call",
+          status: "completed",
+          detail: "Read 2 benchmark examples and prior experiment outcomes.",
+          latencyMs: 520,
+          tokenEstimate: 260,
+        },
+        {
+          id: "agent-step-branch",
+          label: "Branch on evidence confidence",
+          kind: "branch",
+          status: "completed",
+          detail: "Confidence exceeded 85, so the agent produced a launch-ready memo.",
+          latencyMs: 410,
+          tokenEstimate: 240,
+        },
+        {
+          id: "agent-step-final",
+          label: "Write final brief",
+          kind: "final",
+          status: "completed",
+          detail: "Generated decision brief and persisted memory about evidence boundaries.",
+          latencyMs: 890,
+          tokenEstimate: 880,
+        },
+      ],
+    },
+  ],
+  agentMemory: [
+    {
+      id: "memory-research-citations",
+      agentId: "agent-research",
+      key: "preferred_citation_style",
+      value: "Use short source labels, confidence scores, and separate inference from evidence.",
+      updatedAt: "2026-05-15T11:05:02.140Z",
+    },
+    {
+      id: "memory-evaluator-threshold",
+      agentId: "agent-evaluator",
+      key: "risk_thresholds",
+      value: "Flag any prompt release when hallucination rate rises above 18%.",
+      updatedAt: "2026-05-15T10:54:00.000Z",
+    },
+  ],
+  agentTools: [
+    {
+      id: "tool-web-scout",
+      agentId: "agent-research",
+      name: "web-scout",
+      kind: "search",
+      description: "Search abstraction for research tasks with citation capture.",
+      status: "mock",
+    },
+    {
+      id: "tool-rubric-scorer",
+      agentId: "agent-evaluator",
+      name: "rubric-scorer",
+      kind: "evaluation",
+      description: "Scores outputs against reusable benchmark rubrics.",
+      status: "mock",
+    },
+    {
+      id: "tool-policy-rag",
+      agentId: "agent-support",
+      name: "policy-rag",
+      kind: "database",
+      description: "Retrieves policy fragments before support responses are drafted.",
+      status: "mock",
+    },
+  ],
+  benchmarkSuites: [
+    {
+      id: "benchmark-suite-prd",
+      workspaceId: "workspace-promptops",
+      name: "PRD Quality Benchmark",
+      description:
+        "Runs product prompts across examples and models to rank quality, cost, and risk.",
+      promptIds: ["prompt-prd", "prompt-market"],
+      modelIds: ["gpt-5", "claude-sonnet-4.5", "gemini-2.5-pro"],
+      datasetIds: ["benchmark-dataset-product"],
+      metrics: [
+        "accuracy",
+        "hallucination rate",
+        "latency",
+        "cost per output",
+        "consistency",
+        "human feedback",
+      ],
+      status: "completed",
+      createdAt: "2026-05-15T11:10:00.000Z",
+    },
+  ],
+  benchmarkDatasets: [
+    {
+      id: "benchmark-dataset-product",
+      name: "Product Strategy Regression Set",
+      taskType: "product-strategy",
+      examples: [
+        {
+          input: "Turn ambiguous founder notes into a PRD with non-goals.",
+          expected: "Decision-ready PRD with assumptions, risks, and metrics.",
+          difficulty: "medium",
+        },
+        {
+          input: "Summarize market notes and recommend experiments.",
+          expected: "Evidence-bound market memo with experiment ranking.",
+          difficulty: "hard",
+        },
+      ],
+      createdAt: "2026-05-15T11:08:00.000Z",
+    },
+  ],
+  benchmarkRuns: [
+    {
+      id: "benchmark-run-prd-gpt",
+      suiteId: "benchmark-suite-prd",
+      promptId: "prompt-prd",
+      model: "gpt-5",
+      datasetId: "benchmark-dataset-product",
+      status: "completed",
+      accuracy: 92,
+      hallucinationRate: 8,
+      latencyMs: 445,
+      estimatedCostUsd: 0.001115,
+      consistencyScore: 91,
+      regressionDelta: 3,
+      createdAt: "2026-05-15T11:20:00.000Z",
+    },
+    {
+      id: "benchmark-run-prd-claude",
+      suiteId: "benchmark-suite-prd",
+      promptId: "prompt-prd",
+      model: "claude-sonnet-4.5",
+      datasetId: "benchmark-dataset-product",
+      status: "completed",
+      accuracy: 89,
+      hallucinationRate: 12,
+      latencyMs: 512,
+      estimatedCostUsd: 0.002172,
+      consistencyScore: 88,
+      regressionDelta: -2,
+      createdAt: "2026-05-15T11:21:00.000Z",
+    },
+    {
+      id: "benchmark-run-market-gemini",
+      suiteId: "benchmark-suite-prd",
+      promptId: "prompt-market",
+      model: "gemini-2.5-pro",
+      datasetId: "benchmark-dataset-product",
+      status: "completed",
+      accuracy: 86,
+      hallucinationRate: 15,
+      latencyMs: 608,
+      estimatedCostUsd: 0.00192,
+      consistencyScore: 84,
+      regressionDelta: -6,
+      createdAt: "2026-05-15T11:22:00.000Z",
+    },
+  ],
+  benchmarkScores: [
+    {
+      id: "score-prd-gpt-accuracy",
+      runId: "benchmark-run-prd-gpt",
+      metric: "accuracy",
+      value: 92,
+      createdAt: "2026-05-15T11:20:00.000Z",
+    },
+    {
+      id: "score-prd-gpt-cost",
+      runId: "benchmark-run-prd-gpt",
+      metric: "cost efficiency",
+      value: 94,
+      createdAt: "2026-05-15T11:20:00.000Z",
+    },
+  ],
+  traceSessions: [
+    {
+      id: "trace-prd-eval",
+      rootRunId: "ai-run-prd-eval",
+      workspaceId: "workspace-promptops",
+      entityType: "evaluation",
+      entityId: "eval-prd-gpt",
+      name: "PRD prompt evaluation",
+      status: "completed",
+      startedAt: "2026-05-15T09:30:00.000Z",
+      endedAt: "2026-05-15T09:30:00.420Z",
+      totalLatencyMs: 420,
+      totalCostUsd: 0.00066,
+    },
+    {
+      id: "trace-workflow-research",
+      rootRunId: "ai-run-workflow-research",
+      workspaceId: "workspace-promptops",
+      entityType: "workflow",
+      entityId: "workflow-run-research-1",
+      name: "Research Brief Pipeline run",
+      status: "completed",
+      startedAt: "2026-05-15T10:25:00.000Z",
+      endedAt: "2026-05-15T10:25:01.280Z",
+      totalLatencyMs: 1280,
+      totalCostUsd: 0.00492,
+    },
+    {
+      id: "trace-agent-research",
+      rootRunId: "ai-run-agent-research",
+      workspaceId: "workspace-promptops",
+      entityType: "agent",
+      entityId: "agent-run-research-1",
+      name: "Research Agent execution",
+      status: "completed",
+      startedAt: "2026-05-15T11:05:00.000Z",
+      endedAt: "2026-05-15T11:05:02.140Z",
+      totalLatencyMs: 2140,
+      totalCostUsd: 0.00948,
+    },
+    {
+      id: "trace-benchmark-prd",
+      rootRunId: "ai-run-benchmark-prd",
+      workspaceId: "workspace-promptops",
+      entityType: "benchmark",
+      entityId: "benchmark-run-prd-gpt",
+      name: "PRD benchmark run",
+      status: "completed",
+      startedAt: "2026-05-15T11:20:00.000Z",
+      endedAt: "2026-05-15T11:20:00.445Z",
+      totalLatencyMs: 445,
+      totalCostUsd: 0.001115,
+    },
+  ],
+  traceSteps: [
+    {
+      id: "trace-step-eval-render",
+      traceId: "trace-prd-eval",
+      parentStepId: null,
+      label: "Render prompt variables",
+      kind: "prompt",
+      status: "completed",
+      latencyMs: 24,
+      tokenEstimate: 128,
+      estimatedCostUsd: 0,
+      startedAt: "2026-05-15T09:30:00.000Z",
+      endedAt: "2026-05-15T09:30:00.024Z",
+      depth: 0,
+    },
+    {
+      id: "trace-step-eval-model",
+      traceId: "trace-prd-eval",
+      parentStepId: "trace-step-eval-render",
+      label: "Model adapter call",
+      kind: "model",
+      status: "completed",
+      latencyMs: 396,
+      tokenEstimate: 178,
+      estimatedCostUsd: 0.00066,
+      startedAt: "2026-05-15T09:30:00.024Z",
+      endedAt: "2026-05-15T09:30:00.420Z",
+      depth: 1,
+    },
+    {
+      id: "trace-step-workflow-research",
+      traceId: "trace-workflow-research",
+      parentStepId: null,
+      label: "Research scan prompt",
+      kind: "prompt",
+      status: "completed",
+      latencyMs: 440,
+      tokenEstimate: 320,
+      estimatedCostUsd: 0.0018,
+      startedAt: "2026-05-15T10:25:00.000Z",
+      endedAt: "2026-05-15T10:25:00.440Z",
+      depth: 0,
+    },
+    {
+      id: "trace-step-workflow-condition",
+      traceId: "trace-workflow-research",
+      parentStepId: "trace-step-workflow-research",
+      label: "Confidence gate",
+      kind: "condition",
+      status: "completed",
+      latencyMs: 120,
+      tokenEstimate: 40,
+      estimatedCostUsd: 0,
+      startedAt: "2026-05-15T10:25:00.440Z",
+      endedAt: "2026-05-15T10:25:00.560Z",
+      depth: 1,
+    },
+    {
+      id: "trace-step-workflow-output",
+      traceId: "trace-workflow-research",
+      parentStepId: "trace-step-workflow-condition",
+      label: "Executive brief output",
+      kind: "artifact",
+      status: "completed",
+      latencyMs: 720,
+      tokenEstimate: 464,
+      estimatedCostUsd: 0.00312,
+      startedAt: "2026-05-15T10:25:00.560Z",
+      endedAt: "2026-05-15T10:25:01.280Z",
+      depth: 2,
+    },
+    {
+      id: "trace-step-agent-plan",
+      traceId: "trace-agent-research",
+      parentStepId: null,
+      label: "Agent plan",
+      kind: "model",
+      status: "completed",
+      latencyMs: 320,
+      tokenEstimate: 180,
+      estimatedCostUsd: 0.0012,
+      startedAt: "2026-05-15T11:05:00.000Z",
+      endedAt: "2026-05-15T11:05:00.320Z",
+      depth: 0,
+    },
+    {
+      id: "trace-step-agent-tool",
+      traceId: "trace-agent-research",
+      parentStepId: "trace-step-agent-plan",
+      label: "dataset-reader tool",
+      kind: "tool",
+      status: "completed",
+      latencyMs: 520,
+      tokenEstimate: 260,
+      estimatedCostUsd: 0.00168,
+      startedAt: "2026-05-15T11:05:00.320Z",
+      endedAt: "2026-05-15T11:05:00.840Z",
+      depth: 1,
+    },
+    {
+      id: "trace-step-agent-final",
+      traceId: "trace-agent-research",
+      parentStepId: "trace-step-agent-tool",
+      label: "Final response artifact",
+      kind: "artifact",
+      status: "completed",
+      latencyMs: 1300,
+      tokenEstimate: 1120,
+      estimatedCostUsd: 0.0066,
+      startedAt: "2026-05-15T11:05:00.840Z",
+      endedAt: "2026-05-15T11:05:02.140Z",
+      depth: 2,
+    },
+  ],
+  traceLogs: [
+    {
+      id: "trace-log-agent-1",
+      traceId: "trace-agent-research",
+      stepId: "trace-step-agent-tool",
+      level: "info",
+      message: "dataset-reader returned 2 benchmark examples and prior experiment scores.",
+      createdAt: "2026-05-15T11:05:00.840Z",
+    },
+    {
+      id: "trace-log-benchmark-regression",
+      traceId: "trace-benchmark-prd",
+      stepId: null,
+      level: "warning",
+      message: "Gemini adapter showed a -6 regression delta on product strategy examples.",
+      createdAt: "2026-05-15T11:22:00.445Z",
+    },
+  ],
+  promptIntelligence: [
+    {
+      id: "intel-prd",
+      promptId: "prompt-prd",
+      healthScore: 92,
+      clarity: 94,
+      robustness: 90,
+      hallucinationRisk: 12,
+      duplicateRisk: 8,
+      cluster: "Product strategy generators",
+      suggestions: [
+        "Keep evidence and assumptions separated.",
+        "Add non-goals for launch-scope prompts.",
+        "Use GPT-5 for highest rubric accuracy, Claude for tone-sensitive variants.",
+      ],
+      modelRecommendation: "gpt-5",
+      updatedAt: "2026-05-15T11:12:00.000Z",
+    },
+    {
+      id: "intel-review",
+      promptId: "prompt-review",
+      healthScore: 89,
+      clarity: 91,
+      robustness: 88,
+      hallucinationRisk: 15,
+      duplicateRisk: 11,
+      cluster: "Engineering review copilots",
+      suggestions: [
+        "Require file and line references before severity assignment.",
+        "Add explicit non-finding summary rules.",
+      ],
+      modelRecommendation: "gpt-5",
+      updatedAt: "2026-05-15T11:13:00.000Z",
+    },
+  ],
+  promptReleases: [
+    {
+      id: "release-prd-prod",
+      deploymentId: "deployment-prd-prod",
+      versionId: "version-prd-1",
+      tag: "prd-generator@1.0.0",
+      environment: "production",
+      status: "healthy",
+      rolloutPercent: 100,
+      healthScore: 94,
+      notes: "Promoted after benchmark pass and no regression alerts.",
+      createdAt: "2026-05-15T10:05:00.000Z",
+    },
+    {
+      id: "release-review-staging",
+      deploymentId: "deployment-review-staging",
+      versionId: "version-prd-1",
+      tag: "code-review@0.9.0",
+      environment: "staging",
+      status: "watching",
+      rolloutPercent: 25,
+      healthScore: 88,
+      notes: "A/B staging rollout watching hallucination rate and severity precision.",
+      createdAt: "2026-05-15T10:15:00.000Z",
+    },
+  ],
   activities: [
     {
       id: "activity-seed-1",
@@ -821,6 +1720,24 @@ export function normalizeWorkspace(workspace: Partial<PromptWorkspace>): PromptW
       workspace.evaluationPresets ?? seedWorkspace.evaluationPresets,
     organizations: workspace.organizations ?? seedWorkspace.organizations,
     auditLogs: workspace.auditLogs ?? seedWorkspace.auditLogs,
+    aiRuns: workspace.aiRuns ?? seedWorkspace.aiRuns,
+    aiArtifacts: workspace.aiArtifacts ?? seedWorkspace.aiArtifacts,
+    aiMetrics: workspace.aiMetrics ?? seedWorkspace.aiMetrics,
+    agents: workspace.agents ?? seedWorkspace.agents,
+    agentRuns: workspace.agentRuns ?? seedWorkspace.agentRuns,
+    agentMemory: workspace.agentMemory ?? seedWorkspace.agentMemory,
+    agentTools: workspace.agentTools ?? seedWorkspace.agentTools,
+    benchmarkSuites: workspace.benchmarkSuites ?? seedWorkspace.benchmarkSuites,
+    benchmarkDatasets:
+      workspace.benchmarkDatasets ?? seedWorkspace.benchmarkDatasets,
+    benchmarkRuns: workspace.benchmarkRuns ?? seedWorkspace.benchmarkRuns,
+    benchmarkScores: workspace.benchmarkScores ?? seedWorkspace.benchmarkScores,
+    traceSessions: workspace.traceSessions ?? seedWorkspace.traceSessions,
+    traceSteps: workspace.traceSteps ?? seedWorkspace.traceSteps,
+    traceLogs: workspace.traceLogs ?? seedWorkspace.traceLogs,
+    promptIntelligence:
+      workspace.promptIntelligence ?? seedWorkspace.promptIntelligence,
+    promptReleases: workspace.promptReleases ?? seedWorkspace.promptReleases,
     activities: workspace.activities ?? [],
     workspaces: workspace.workspaces ?? seedWorkspace.workspaces,
     collections: workspace.collections ?? seedWorkspace.collections,
