@@ -1,6 +1,6 @@
-# PromptDeck OS Architecture
+# PromptDeck AI — PromptOps Platform Architecture
 
-PromptDeck OS positions prompt management as AI workflow infrastructure: teams capture prompts, manage variables, version changes, run evaluations, optimize prompt quality, share collections, and observe usage.
+PromptDeck AI — PromptOps Platform positions prompt management as AI workflow infrastructure: teams capture prompts, manage variables, version changes, run evaluations, optimize prompt quality, share collections, and observe usage.
 
 ## Product Surface
 
@@ -36,7 +36,7 @@ flowchart TD
 ```mermaid
 sequenceDiagram
   participant User
-  participant UI as PromptDeck OS
+  participant UI as PromptDeck AI
   participant API as Next API
   participant AI as Provider Adapter
   participant DB as Supabase

@@ -1,26 +1,26 @@
-# PromptDeck OS
+# PromptDeck AI — PromptOps Platform
 
-A production-minded PromptOps workflow operating system for managing, versioning, testing, optimizing, sharing, and evaluating reusable AI prompts.
+A production-minded PromptOps platform for managing, versioning, testing, optimizing, sharing, and evaluating reusable AI prompts.
 
-PromptDeck OS is built as the actual SaaS console, not a marketing landing page. It runs in local demo mode without paid provider access, and it can persist prompts, versions, evaluations, categories, runs, and collaboration foundations to Supabase when production credentials and migrations are configured.
+PromptDeck AI — PromptOps Platform is built as the actual SaaS console, not a marketing landing page. It runs in local demo mode without paid provider access, and it can persist prompts, versions, evaluations, categories, runs, and collaboration foundations to Supabase when production credentials and migrations are configured.
 
 ## Demo
 
-![PromptDeck OS animated demo](docs/demos/promptops-demo.gif)
+![PromptDeck AI PromptOps Platform animated demo](docs/demos/promptops-demo.gif)
 
 ## Screenshots
 
 ### PromptOps Console
 
-![PromptDeck OS desktop dashboard](docs/screenshots/dashboard-desktop.png)
+![PromptDeck AI PromptOps Platform desktop dashboard](docs/screenshots/dashboard-desktop.png)
 
 ### Mobile
 
-![PromptDeck OS mobile dashboard](docs/screenshots/dashboard-mobile.png)
+![PromptDeck AI PromptOps Platform mobile dashboard](docs/screenshots/dashboard-mobile.png)
 
 ### Shared Prompt
 
-![PromptDeck OS shared prompt page](docs/screenshots/shared-prompt.png)
+![PromptDeck AI PromptOps Platform shared prompt page](docs/screenshots/shared-prompt.png)
 
 ## Production Features
 

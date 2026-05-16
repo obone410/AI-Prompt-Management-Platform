@@ -1,6 +1,6 @@
 # Supabase Setup
 
-PromptDeck OS includes Supabase schema, indexes, triggers, RPCs, and RLS policies in `supabase/migrations`.
+PromptDeck AI — PromptOps Platform includes Supabase schema, indexes, triggers, RPCs, and RLS policies in `supabase/migrations`.
 
 ## Migration Order
 

@@ -4,7 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { ManagedPrompt } from "@/lib/prompts";
 
 export const metadata: Metadata = {
-  title: "Shared Prompt | PromptDeck OS",
+  title: "Shared Prompt | PromptDeck AI",
 };
 
 type PublicPromptRow = {

@@ -1495,10 +1495,10 @@ export function PromptConsole() {
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0f766e]">
-                PromptOps workflow operating system
+                PromptOps Platform
               </p>
               <h1 className="truncate text-2xl font-semibold tracking-normal sm:text-3xl">
-                PromptDeck OS
+                PromptDeck AI
               </h1>
             </div>
           </div>

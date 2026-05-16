@@ -1,6 +1,6 @@
 # Security Notes
 
-PromptDeck OS is designed so public keys can be committed only through `.env.example`, while real credentials stay in `.env.local`, Vercel project secrets, or Supabase project settings.
+PromptDeck AI — PromptOps Platform is designed so public keys can be committed only through `.env.example`, while real credentials stay in `.env.local`, Vercel project secrets, or Supabase project settings.
 
 ## Implemented Checks
 

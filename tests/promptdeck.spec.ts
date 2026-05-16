@@ -4,7 +4,7 @@ test("runs the demo prompt workflow and opens a shared prompt", async ({ page })
   await page.goto("/");
   await page.waitForLoadState("networkidle");
 
-  await expect(page.getByRole("heading", { name: "PromptDeck OS" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "PromptDeck AI" })).toBeVisible();
   await expect(page.getByText("Turn Notes Into a Product Brief").first()).toBeVisible();
 
   await expect(page.getByRole("button", { name: "Use demo" })).toBeEnabled();
