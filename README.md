@@ -118,11 +118,12 @@ Optional environment variables:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5
 ```
 
-Use `.env.example` as the template. Real `.env*` files are ignored by Git.
+Use `.env.example` as the template. `NEXT_PUBLIC_SUPABASE_ANON_KEY` is only a compatibility fallback for older Supabase dashboards; new projects should use `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Real `.env*` files are ignored by Git.
 
 ## Verification
 
@@ -144,18 +145,30 @@ found 0 vulnerabilities
 
 The project also includes `SECURITY.md` with implemented checks and production hardening notes.
 
+Local browser QA was performed with Playwright against a production build. Refreshed screenshots are stored in `docs/screenshots/`.
+
 ## Deployment Process
 
 1. Create a Supabase project.
-2. Apply `supabase/migrations/202605150001_initial_promptdeck_schema.sql`.
+2. Apply all SQL files in `supabase/migrations/` in filename order.
 3. Configure Supabase Auth redirect URLs for local, preview, and production.
 4. Create a Vercel project from this repository.
 5. Add environment variables in Vercel:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` if your Supabase dashboard only exposes an anon key
    - `OPENAI_API_KEY`
    - `OPENAI_MODEL`
 6. Deploy with Vercel.
+
+## GitHub Readiness
+
+The repository is committed locally and ready to push once a GitHub remote is added. Missing external credentials in this environment:
+
+- No `OPENAI_API_KEY`
+- No Supabase project URL or publishable key
+- No Vercel token/project link
+- No GitHub remote or authenticated GitHub CLI
 
 ## Designing For 1 Million Users
 
