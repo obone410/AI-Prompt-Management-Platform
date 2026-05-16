@@ -97,5 +97,5 @@ These are intentionally absent from the repository and must be configured in loc
 - `OPENAI_API_KEY` is configured in Vercel Production and Development environments, but values are encrypted/write-only.
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `SENTRY_DSN`, and `POSTHOG_PROJECT_API_KEY` are optional production integrations and are not committed.
 - Vercel Production and Development env vars are configured; Preview env vars were not present in the CLI listing and should be added before preview deployments are used.
-- Supabase migrations require privileged database credentials, a Supabase access token, or a dashboard SQL run; public anon/publishable keys cannot apply schema changes.
+- Supabase migrations are applied to project `gujupmdzuonefgliqrdu`; future schema changes still require privileged Supabase management access because public anon/publishable keys cannot apply DDL.
 - GitHub remote is configured; pushing depends on local GitHub authentication.

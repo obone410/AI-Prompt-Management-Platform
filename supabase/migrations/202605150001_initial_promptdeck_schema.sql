@@ -34,12 +34,7 @@ create table if not exists public.prompts (
   share_slug text,
   usage_count integer not null default 0 check (usage_count >= 0),
   last_tested_at timestamptz,
-  search_document tsvector generated always as (
-    setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
-    setweight(to_tsvector('english', coalesce(description, '')), 'B') ||
-    setweight(to_tsvector('english', coalesce(array_to_string(tags, ' '), '')), 'B') ||
-    setweight(to_tsvector('english', coalesce(content, '')), 'C')
-  ) stored,
+  search_document tsvector not null default ''::tsvector,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -64,6 +59,23 @@ set search_path = public
 as $$
 begin
   new.updated_at = now();
+  return new;
+end;
+$$;
+
+create or replace function public.refresh_prompt_search_document()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.search_document :=
+    setweight(to_tsvector('english', coalesce(new.title, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(new.description, '')), 'B') ||
+    setweight(to_tsvector('english', coalesce(array_to_string(new.tags, ' '), '')), 'B') ||
+    setweight(to_tsvector('english', coalesce(new.content, '')), 'C');
+
   return new;
 end;
 $$;
@@ -101,6 +113,11 @@ drop trigger if exists set_prompts_updated_at on public.prompts;
 create trigger set_prompts_updated_at
 before update on public.prompts
 for each row execute function public.set_updated_at();
+
+drop trigger if exists refresh_prompts_search_document on public.prompts;
+create trigger refresh_prompts_search_document
+before insert or update of title, description, tags, content on public.prompts
+for each row execute function public.refresh_prompt_search_document();
 
 drop trigger if exists create_profile_on_signup on auth.users;
 create trigger create_profile_on_signup
