@@ -9,8 +9,14 @@ import {
 } from "@/lib/prompts";
 import { buildMarkdownExport } from "@/lib/export-prompts";
 
-export function SharedPromptView({ slug }: { slug: string }) {
-  const [prompt, setPrompt] = useState<ManagedPrompt | null>(null);
+export function SharedPromptView({
+  slug,
+  initialPrompt = null,
+}: {
+  slug: string;
+  initialPrompt?: ManagedPrompt | null;
+}) {
+  const [prompt, setPrompt] = useState<ManagedPrompt | null>(initialPrompt);
   const [workspace, setWorkspace] = useState<PromptWorkspace | null>(null);
 
   useEffect(() => {
@@ -25,21 +31,22 @@ export function SharedPromptView({ slug }: { slug: string }) {
 
       try {
         const parsed = JSON.parse(saved) as PromptWorkspace;
-        setWorkspace(parsed);
-        setPrompt(
+        const localPrompt =
           parsed.prompts.find(
             (item) => item.isPublic && item.shareSlug === slug,
-          ) ?? null,
-        );
+          ) ?? null;
+
+        setWorkspace(parsed);
+        setPrompt(localPrompt ?? initialPrompt);
       } catch {
-        setPrompt(null);
+        setPrompt(initialPrompt);
       }
     });
 
     return () => {
       mounted = false;
     };
-  }, [slug]);
+  }, [slug, initialPrompt]);
 
   function copyPrompt() {
     if (prompt) {
@@ -48,11 +55,11 @@ export function SharedPromptView({ slug }: { slug: string }) {
   }
 
   function downloadPrompt() {
-    if (!prompt || !workspace) {
+    if (!prompt) {
       return;
     }
 
-    const markdown = buildMarkdownExport([prompt], workspace.categories);
+    const markdown = buildMarkdownExport([prompt], workspace?.categories ?? []);
     const blob = new Blob([markdown], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");

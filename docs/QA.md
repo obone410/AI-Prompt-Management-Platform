@@ -19,6 +19,29 @@ Artifacts:
 - `docs/screenshots/dashboard-desktop.png`
 - `docs/screenshots/dashboard-mobile.png`
 - `docs/screenshots/shared-prompt.png`
+- `docs/screenshots/live-production-security.png`
+
+## Production Browser QA
+
+Target: `https://ai-prompt-management-platform.vercel.app`
+
+Deployment: `https://ai-prompt-management-platform-reop4c4ke.vercel.app`
+
+Result:
+
+- Homepage returned `200`.
+- Share route returned `200`.
+- Browser console errors: `0`.
+- Failed network requests: `0`.
+- Unexpected 4xx/5xx page asset responses: `0`.
+- Live unauthenticated `POST /api/test-prompt` returned `401`, confirming provider spend is gated behind Supabase auth.
+
+Performance spot check:
+
+| Route | DOMContentLoaded | Load | LCP | Transferred |
+| --- | ---: | ---: | ---: | ---: |
+| `/` | 563 ms | 758 ms | 1208 ms | 286 KB |
+| `/share/product-brief` | 1053 ms | 1126 ms | 1072 ms | 216 KB |
 
 ## Command Verification
 
@@ -32,12 +55,25 @@ npm audit --audit-level=moderate
 
 Result: all checks passed, audit found zero vulnerabilities.
 
+## Security Audit
+
+Latest production scan:
+
+- `docs/SECURITY_AUDIT_2026-05-16.md`
+
+Summary:
+
+- Deployed HTML and 8 generated JavaScript assets were scanned.
+- No OpenAI, Vercel, or Supabase service-role secrets were found in deployed assets.
+- The only deployed key-like values found were the expected public Supabase URL and publishable key.
+- Security headers are present on production responses.
+
 ## External Credential Gaps
 
 These are intentionally absent from the repository and must be configured in local `.env.local` or deployment secrets:
 
 - Supabase URL and public keys are configured locally in ignored `.env.local`.
-- `OPENAI_API_KEY` is configured locally, but the provider returned a quota/billing 429 during live route validation.
-- Supabase migrations still require privileged database credentials, a Supabase access token, or a dashboard SQL run; public anon/publishable keys cannot apply schema changes.
-- Vercel team ID is configured locally, but no Vercel token or linked project is present.
-- GitHub remote is configured; push still depends on local GitHub authentication.
+- `OPENAI_API_KEY` is configured in Vercel Production and Development environments, but values are encrypted/write-only.
+- Vercel Production and Development env vars are configured; Preview env vars were not present in the CLI listing and should be added before preview deployments are used.
+- Supabase migrations require privileged database credentials, a Supabase access token, or a dashboard SQL run; public anon/publishable keys cannot apply schema changes.
+- GitHub remote is configured; pushing depends on local GitHub authentication.

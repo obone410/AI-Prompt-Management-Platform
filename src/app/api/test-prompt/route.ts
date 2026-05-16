@@ -1,7 +1,9 @@
 import OpenAI from "openai";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { publicConfig } from "@/lib/config";
 import { serverConfig } from "@/lib/server-config";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -45,6 +47,24 @@ function supportsTemperature(model: string) {
   return !/^(gpt-5|o\d|o[134]|gpt-oss)/i.test(model);
 }
 
+async function hasSupabaseSession() {
+  if (!publicConfig.isSupabaseConfigured) {
+    return false;
+  }
+
+  const supabase = await createServerSupabaseClient();
+
+  if (!supabase) {
+    return false;
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  return Boolean(user);
+}
+
 export async function POST(request: NextRequest) {
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
@@ -59,7 +79,18 @@ export async function POST(request: NextRequest) {
   }
 
   const startedAt = performance.now();
-  const parsed = PromptTestSchema.safeParse(await request.json());
+  let body: unknown;
+
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid JSON prompt test payload." },
+      { status: 400 },
+    );
+  }
+
+  const parsed = PromptTestSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -70,6 +101,17 @@ export async function POST(request: NextRequest) {
 
   const { prompt, input, temperature } = parsed.data;
   const model = parsed.data.model ?? serverConfig.openAiModel;
+
+  if (
+    serverConfig.isOpenAiConfigured &&
+    publicConfig.isSupabaseConfigured &&
+    !(await hasSupabaseSession())
+  ) {
+    return NextResponse.json(
+      { error: "Sign in to run live AI prompt tests." },
+      { status: 401 },
+    );
+  }
 
   if (!serverConfig.isOpenAiConfigured) {
     return NextResponse.json({

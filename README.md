@@ -32,16 +32,17 @@ PromptDeck AI is built as a real working console, not a landing page. It runs lo
 - Responsive dashboard UI for desktop and mobile
 - Supabase SQL migration with indexes, triggers, constraints, and RLS policies
 - Slug-scoped public prompt RPC for safer sharing
+- Production security headers and authenticated live AI testing
 - Playwright e2e coverage for the core demo workflow
 
 ## Tech Stack
 
 - Next.js `16.2.6` App Router
-- React `19.2.4`
+- React `19.2.6`
 - Tailwind CSS `4.3.0`
 - Supabase SSR helpers `0.10.3`
 - Supabase JS `2.105.4`
-- OpenAI Node SDK `6.37.0`
+- OpenAI Node SDK `6.38.0`
 - Zod `4.4.3`
 - Lucide React icons
 - Playwright for local browser verification
@@ -96,7 +97,7 @@ The test bench calls:
 POST /api/test-prompt
 ```
 
-The route validates input with Zod, rate-limits local requests, keeps `OPENAI_API_KEY` server-only, and uses the OpenAI Responses API when credentials exist. It omits temperature automatically for models that do not support that parameter.
+The route validates input with Zod, rate-limits local requests, keeps `OPENAI_API_KEY` server-only, and uses the OpenAI Responses API when credentials exist. When Supabase and OpenAI are configured together, live tests require a Supabase session so anonymous traffic cannot spend provider quota. The route also omits temperature automatically for models that do not support that parameter.
 
 If no OpenAI key is configured, the route returns a deterministic demo response so the project can still be reviewed locally.
 
@@ -147,6 +148,14 @@ The project also includes `SECURITY.md` with implemented checks and production h
 
 Local browser QA was performed with Playwright against a production build. Refreshed screenshots are stored in `docs/screenshots/`.
 
+The latest production security pass is documented in:
+
+```text
+docs/SECURITY_AUDIT_2026-05-16.md
+```
+
+It confirmed security headers are present, deployed assets do not expose OpenAI/Vercel/Supabase service-role secrets, and the live AI test API returns `401` for unauthenticated provider-spend attempts.
+
 ## Deployment Process
 
 1. Create a Supabase project.
@@ -161,14 +170,19 @@ Local browser QA was performed with Playwright against a production build. Refre
    - `OPENAI_MODEL`
 6. Deploy with Vercel.
 
-## GitHub Readiness
+## GitHub And Vercel Readiness
 
-The repository is committed locally and ready to push once a GitHub remote is added. Missing external credentials in this environment:
+- GitHub remote: `https://github.com/obone410/AI-Prompt-Management-Platform.git`
+- Production URL: `https://ai-prompt-management-platform.vercel.app`
+- Latest checked deployment: `https://ai-prompt-management-platform-reop4c4ke.vercel.app`
+- Vercel Production and Development environment variables are configured with encrypted values.
+- Vercel Preview environment variables should be added before preview deployments are used.
 
-- Supabase URL and public keys are configured in ignored `.env.local`.
-- `OPENAI_API_KEY` is configured in ignored `.env.local`, but live validation returned a provider quota/billing error.
-- Vercel team ID is configured in ignored `.env.local`; Vercel token/project link is still missing.
-- GitHub remote is configured; pushing depends on local GitHub authentication.
+Missing external credentials are intentionally not stored in the repository:
+
+- Supabase URL and public keys live in ignored `.env.local` and encrypted Vercel env vars.
+- `OPENAI_API_KEY` lives in ignored `.env.local` and encrypted Vercel env vars.
+- Supabase migrations require privileged project access or a dashboard SQL run; public browser keys cannot apply schema changes.
 
 ## Designing For 1 Million Users
 
