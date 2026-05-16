@@ -15,10 +15,10 @@ Coverage:
 - AI-assisted prompt optimization renders suggestions in demo mode.
 - Side-by-side model evaluation renders GPT and Claude adapter cards in demo mode.
 - Experiment workflows render lifecycle status, datasets, reusable rubrics, score trends, and benchmark history.
-- AI Operations command center renders lifecycle, global search, prompt health, and top runs.
-- AI Benchmarking Engine renders suites, datasets, leaderboard, heatmap, regression alerts, and benchmark execution.
-- Agent Builder renders agents, tool inspector, memory, execution canvas, and trace timeline.
-- Observability Center renders unified AI runs, trace tree, artifacts, logs, and performance breakdown.
+- AI Execution command center renders lifecycle, global search, prompt health, and top runs.
+- AI Benchmarking Engine renders suites, datasets, leaderboard, heatmap, dataset-level results, regression alerts, and benchmark execution.
+- Agent Builder renders agents, tool invocation logs, memory, execution canvas, and trace timeline.
+- Observability Center renders unified AI runs, trace nodes, trace events, artifacts, logs, timeline replay, and performance breakdown.
 - Workflow Studio renders prompt, variable, condition, and output nodes with run history and execution logs.
 - Release Management renders Development, Staging, and Production lifecycle controls with rollout, health, rollback, and promotion actions.
 - Analytics and Team tabs render from the production build.
@@ -49,8 +49,8 @@ Result:
 
 - Homepage returned `200`.
 - Share route returned `200`.
-- Production title returned `PromptDeck AI v3.0 — AI Operations Platform`.
-- Version marker `AI Operations OS v3.0.0` rendered in the live UI.
+- Production title returned `PromptDeck AI v3.1 — AI Execution OS`.
+- Version marker `AI Execution OS v3.1.0` rendered in the live UI.
 - Browser console errors: `0`.
 - Failed network requests: `0`.
 - Unexpected 4xx/5xx page asset responses: `0`.
@@ -62,8 +62,8 @@ Performance spot check:
 
 | Route | DOMContentLoaded | Load | FCP | Transferred |
 | --- | ---: | ---: | ---: | ---: |
-| `/` | 474 ms | 768 ms | 548 ms | 458 KB |
-| `/share/product-brief` | 928 ms | 995 ms | 944 ms | 224 KB |
+| `/` | 390 ms | 574 ms | 468 ms | 461 KB |
+| `/share/product-brief` | 1724 ms | 2083 ms | 1732 ms | 12 KB |
 
 ## Command Verification
 
@@ -106,5 +106,5 @@ These are intentionally absent from the repository and must be configured in loc
 - `OPENAI_API_KEY` is configured in Vercel Production and Development environments, but values are encrypted/write-only.
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `SENTRY_DSN`, and `POSTHOG_PROJECT_API_KEY` are optional production integrations and are not committed.
 - Vercel Production and Development env vars are configured; Preview env vars were not present in the CLI listing and should be added before preview deployments are used.
-- Supabase migrations are applied to project `gujupmdzuonefgliqrdu`, including the v3 `ai_operations_platform` migration; future schema changes still require privileged Supabase management access because public anon/publishable keys cannot apply DDL.
+- Supabase migrations are applied to project `gujupmdzuonefgliqrdu`, including the v3.1 `unified_execution_observability` migration; future schema changes still require privileged Supabase management access because public anon/publishable keys cannot apply DDL.
 - GitHub remote is configured; pushing depends on local GitHub authentication.

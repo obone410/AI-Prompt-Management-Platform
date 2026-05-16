@@ -1,8 +1,8 @@
-# PromptDeck AI v3.0 — AI Operations Platform
+# PromptDeck AI v3.1 — AI Execution & Observability OS
 
-A production-grade AI operations platform for LLMOps, prompt lifecycle management, benchmarking, agents, workflows, releases, traces, observability, and enterprise AI operations.
+A production-grade AI execution and observability operating system for LLMOps, prompt lifecycle management, dataset-driven benchmarking, agents, workflows, releases, traces, and enterprise AI operations.
 
-PromptDeck AI v3.0 is built as the actual SaaS console, not a marketing landing page. It unifies prompts, versions, experiments, evaluations, workflows, deployments, observations, improvements, and agents under one execution model: `ai_runs`, `ai_artifacts`, `ai_metrics`, and trace sessions. Demo mode works without paid provider access, while Supabase persistence and RLS are ready for production credentials.
+PromptDeck AI v3.1 is built as the actual SaaS console, not a marketing landing page. It unifies prompts, experiments, evaluations, workflows, deployments, observations, improvements, and agents under one execution backbone: `ai_runs`, `ai_trace_events`, `trace_nodes`, `ai_artifacts`, and `ai_metrics`. Demo mode works without paid provider access, while Supabase persistence and RLS are ready for production credentials.
 
 ## Demo
 
@@ -44,22 +44,23 @@ PromptDeck AI v3.0 is built as the actual SaaS console, not a marketing landing 
 
 ## Production Features
 
-- AI Operations Platform release version: `3.0.0`
-- Unified AI operations lifecycle: Prompt → Version → Experiment → Evaluation → Workflow → Deployment → Observation → Improvement
-- Shared execution model with `ai_runs`, `ai_artifacts`, `ai_metrics`, `trace_sessions`, `trace_steps`, and `trace_logs`
+- AI Execution OS release version: `3.1.0`
+- Unified AI execution lifecycle: Prompt → Run → Trace → Artifact → Metric → Benchmark → Release → Improvement
+- Shared execution model with `ai_runs`, `ai_trace_events`, `trace_sessions`, `trace_nodes`, `trace_logs`, `ai_artifacts`, and `ai_metrics`
+- Central execution helper in `src/lib/ai-execution.ts` so prompt tests, evaluations, experiments, workflows, agents, benchmarks, prompt improvements, and deployment dry runs all emit the same run/trace/artifact/metric shape
 - PromptOps command center with CRUD, search, filters, favorites, sharing, export, variables, health scoring, and Cmd+K actions
-- AI Benchmarking Engine that merges experiments and evaluations into suites, datasets, runs, scores, leaderboards, heatmaps, and regression alerts
-- First-class AI Agents with agent builder canvas, execution trace viewer, tool abstraction layer, memory viewer, and agent run history
-- Workflow Engine v2 with condition, loop, retry/fallback, parallel, dataset-driven, replay-ready, and node-cache-ready concepts
+- AI Benchmarking Engine that merges experiments and evaluations into suites, datasets, runs, results, scores, leaderboards, heatmaps, and regression alerts
+- First-class AI Agents with agent builder canvas, execution trace viewer, tool invocation logs, memory viewer, and agent run history
+- Workflow Engine v2 with stateful execution logs, condition, loop, retry/fallback, parallel, dataset-driven, replay-ready, and node-cache-ready concepts
 - Release Management v2 for Development, Staging, and Production with staged rollout, A/B testing, release tags, health scores, and rollback actions
-- Event-driven observability with trace trees, step inspector, artifacts, logs, token usage, latency, and cost per execution
+- LangSmith-style observability with trace trees, trace events, node inspector, artifacts, logs, token usage, latency, cost, and replay-oriented debugging per execution
 - Full prompt versioning foundations with `prompt_versions`, automatic Supabase edit snapshots, local version notes, rollback, and git-style diffs
 - Dynamic `{{variable}}` detection, generated input forms, validation, and live rendered prompt preview
 - AI-assisted prompt optimization with structure, clarity, variable, and hallucination-risk suggestions
 - Side-by-side model evaluation across GPT, Claude, and Gemini adapter abstractions
 - Evaluation cards with output, metrics, notes, latency, token estimates, cost estimates, output length, and heuristic quality score
 - Token and cost intelligence with input/output tokens, estimated USD spend, provider usage, cheapest provider, fastest provider, monthly token charts, and provider efficiency
-- Global AI Operations dashboard with usage frequency, category usage, average latency, provider usage, token spend, trace counts, agent activity, and recent activity
+- Global AI Execution dashboard with usage frequency, category usage, average latency, provider usage, token spend, trace counts, agent activity, and recent activity
 - Organization, workspace, shared library, team role, invite, audit log, and activity feed foundations
 - Server-only provider calls, Zod validation, protected live AI routes, RLS-first schema, and secure env handling
 - Upstash Redis rate-limit integration with a local development fallback
@@ -84,19 +85,20 @@ PromptDeck AI v3.0 is built as the actual SaaS console, not a marketing landing 
 - Playwright
 - Vercel
 
-## AI Operations Lifecycle
+## AI Execution Lifecycle
 
 ```mermaid
 flowchart LR
   Capture["Capture prompt idea"] --> Structure["Add variables and output contract"]
-  Structure --> Version["Save version and changelog"]
-  Version --> Experiment["Run experiments and benchmarks"]
-  Experiment --> Evaluate["Evaluate model and dataset behavior"]
-  Evaluate --> Workflow["Chain workflows or agents"]
-  Workflow --> Deploy["Release to environments"]
-  Deploy --> Observe["Trace cost, latency, quality, drift, errors"]
+  Structure --> Run["Create ai_run"]
+  Run --> Trace["Emit trace_nodes + ai_trace_events"]
+  Trace --> Artifact["Store ai_artifacts"]
+  Artifact --> Metrics["Normalize ai_metrics"]
+  Metrics --> Benchmark["Dataset benchmark + regression check"]
+  Benchmark --> Release["Release or rollback"]
+  Release --> Observe["Observe cost, latency, quality, errors"]
   Observe --> Improve["Improve prompt, agent, workflow, or release"]
-  Improve --> Version
+  Improve --> Run
 ```
 
 ## Architecture
@@ -113,10 +115,10 @@ flowchart TD
   Providers --> Gemini["Gemini adapter"]
   API --> Observability["Observability hooks"]
   SupabaseClient --> RLS["Supabase Postgres + RLS"]
-  RLS --> UnifiedRuns["ai_runs + ai_artifacts + ai_metrics"]
-  RLS --> Traces["trace_sessions + trace_steps + trace_logs"]
-  RLS --> Agents["agents + agent_runs + agent_memory + agent_tools"]
-  RLS --> Benchmarks["benchmark_suites + benchmark_runs + benchmark_scores"]
+  RLS --> UnifiedRuns["ai_runs + ai_trace_events + ai_artifacts + ai_metrics"]
+  RLS --> Traces["trace_sessions + trace_nodes + trace_steps + trace_logs"]
+  RLS --> Agents["agents + agent_runs + agent_memory + agent_tools + agent_tool_calls"]
+  RLS --> Benchmarks["benchmark_suites + benchmark_runs + benchmark_results + benchmark_scores"]
   RLS --> Versions["prompt_versions"]
   RLS --> Evaluations["prompt_evaluations"]
   RLS --> Experiments["prompt_experiments"]
@@ -162,23 +164,27 @@ Core tables:
 - `prompt_collections`
 - `collection_prompts`
 - `ai_runs`
+- `ai_trace_events`
 - `ai_artifacts`
 - `ai_metrics`
 - `trace_sessions`
+- `trace_nodes`
 - `trace_steps`
 - `trace_logs`
 - `agents`
 - `agent_runs`
 - `agent_memory`
 - `agent_tools`
+- `agent_tool_calls`
 - `benchmark_suites`
 - `benchmark_datasets`
 - `benchmark_runs`
+- `benchmark_results`
 - `benchmark_scores`
 - `prompt_intelligence`
 - `prompt_releases`
 
-Scale-oriented indexes cover user dashboards, categories, favorites, tags, full-text search, public share slugs, prompt versions, evaluations, experiment runs, deployment history, workflow runs, agent runs, benchmark runs, trace sessions, trace steps, AI metrics, audit logs, activity timelines, and workspace membership.
+Scale-oriented indexes cover user dashboards, categories, favorites, tags, full-text search, public share slugs, prompt versions, evaluations, experiment runs, deployment history, workflow runs, agent runs, agent tool calls, benchmark runs/results, trace sessions, trace nodes/events/steps, AI metrics, audit logs, activity timelines, and workspace membership.
 
 See [docs/SUPABASE.md](docs/SUPABASE.md) for the RLS policy matrix and migration order.
 
@@ -274,7 +280,7 @@ https://github.com/obone410/AI-Prompt-Management-Platform.git
 - Upstash Redis can enforce distributed rate limits across Vercel regions.
 - The UI has a load-more pagination path and can move to cursor pagination for very large workspaces.
 - Evaluation work uses an inline job abstraction today and can be moved to a queue without changing UI contracts.
-- AI runs, trace steps, benchmark runs, agent runs, deployment history, workflow runs, and audit logs are append-oriented and can be partitioned or archived as volume grows.
+- AI runs, trace events, trace nodes, benchmark results, agent tool calls, deployment history, workflow runs, and audit logs are append-oriented and can be partitioned or archived as volume grows.
 - Provider usage summaries can be moved to warehouse-backed materialized views for very large workspaces.
 
 ## Recruiter Signals

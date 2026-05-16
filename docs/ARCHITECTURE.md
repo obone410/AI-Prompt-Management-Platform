@@ -1,16 +1,16 @@
-# PromptDeck AI v3.0 — AI Operations Platform Architecture
+# PromptDeck AI v3.1 — AI Execution & Observability OS Architecture
 
-PromptDeck AI v3.0 positions prompt work as a full AI operations lifecycle: teams capture prompt changes, benchmark model behavior, run workflow and agent executions, release prompt versions across environments, and observe cost, latency, quality, traces, artifacts, and regressions through one shared execution model.
+PromptDeck AI v3.1 positions prompt work as a unified AI execution lifecycle: every prompt test, evaluation, experiment, workflow, agent run, benchmark, optimization, and deployment dry run becomes an `ai_run` with trace nodes, trace events, artifacts, and normalized metrics.
 
 ## Product Surface
 
 - PromptOps console: CRUD, search, favorites, sharing, export, variables, and versioning
-- AI Operations command center: lifecycle metrics, global search, prompt health, top runs, and global controls
-- AI Benchmarking Engine: benchmark suites, datasets, benchmark runs, scores, leaderboards, heatmaps, and regression alerts
-- Agents: first-class research/support/coding/data-extraction/evaluation agents with tools, memory, and execution traces
+- AI Execution command center: lifecycle metrics, global search, prompt health, top runs, and global controls
+- AI Benchmarking Engine: benchmark suites, datasets, benchmark runs/results, scores, leaderboards, heatmaps, and regression alerts
+- Agents: first-class research/support/coding/data-extraction/evaluation agents with tools, memory, tool-call logs, and execution traces
 - Releases: Development/Staging/Production promotion, staged rollout, A/B testing, rollback, health, and release metadata
 - Workflow Engine v2: prompt, variable, condition, loop, parallel, retry, and output nodes with execution timeline and run logs
-- Observability: unified runs, artifacts, metrics, trace sessions, trace steps, trace logs, and step inspector
+- Observability: unified runs, artifacts, metrics, trace sessions, trace nodes, trace events, trace logs, replay timeline, and step inspector
 - AI evaluation suite: test prompts, compare model adapters, inspect metrics, and optimize prompts
 - Analytics: provider efficiency, token usage, estimated spend, cheapest provider, fastest provider, latency, and activity timelines
 - Team foundations: organizations, workspaces, members, roles, invites, shared collections, and audit logs
@@ -19,7 +19,7 @@ PromptDeck AI v3.0 positions prompt work as a full AI operations lifecycle: team
 
 ```mermaid
 flowchart TD
-  Browser["React 19 AI Operations UI"] --> LocalStore["Local demo workspace"]
+  Browser["React 19 AI Execution UI"] --> LocalStore["Local demo workspace"]
   Browser --> SupabaseBrowser["Supabase browser client"]
   Browser --> Routes["Next.js API routes"]
 
@@ -36,14 +36,14 @@ flowchart TD
 
   SupabaseBrowser --> Postgres["Supabase Postgres"]
   Postgres --> RLS["Row Level Security"]
-  Postgres --> UnifiedRuns["ai_runs, ai_artifacts, ai_metrics"]
-  Postgres --> Traces["trace_sessions, trace_steps, trace_logs"]
-  Postgres --> Agents["agents, agent_runs, memory, tools"]
-  Postgres --> Benchmarks["benchmark suites, runs, scores"]
+  Postgres --> UnifiedRuns["ai_runs, ai_trace_events, ai_artifacts, ai_metrics"]
+  Postgres --> Traces["trace_sessions, trace_nodes, trace_steps, trace_logs"]
+  Postgres --> Agents["agents, agent_runs, memory, tools, tool calls"]
+  Postgres --> Benchmarks["benchmark suites, runs, results, scores"]
   Postgres --> AppendOnly["Append-only traces, deployments, audits"]
 ```
 
-## AI Operations Lifecycle
+## AI Execution Lifecycle
 
 ```mermaid
 sequenceDiagram
@@ -63,11 +63,11 @@ sequenceDiagram
   API->>AI: Run selected model adapters
   AI-->>API: Outputs and metrics
   API-->>UI: Evaluation cards
-  UI->>DB: Persist ai_runs, ai_artifacts, ai_metrics, trace tree
+  UI->>DB: Persist ai_runs, ai_trace_events, trace_nodes, artifacts, metrics
   User->>UI: Run agent or workflow
-  UI->>DB: Persist agent_runs/workflow_runs plus trace_steps and trace_logs
+  UI->>DB: Persist agent_runs/workflow_runs plus trace nodes/events/logs
   User->>UI: Deploy prompt release
-  UI->>DB: Write prompt_deployments, prompt_releases, deployment_history
+  UI->>DB: Write deployment dry-run ai_run plus release metadata
   User->>UI: Run workflow pipeline
   UI->>DB: Store workflow_runs with unified trace and artifact output
 ```
@@ -108,14 +108,19 @@ erDiagram
   prompt_deployments ||--o{ deployment_history : logs
   prompt_deployments ||--o{ prompt_releases : tags
   ai_workflows ||--o{ workflow_runs : executes
+  ai_runs ||--o{ ai_trace_events : events
   ai_runs ||--o{ ai_artifacts : emits
   ai_runs ||--o{ ai_metrics : measures
-  trace_sessions ||--o{ trace_steps : contains
+  trace_sessions ||--o{ trace_nodes : contains
+  trace_sessions ||--o{ ai_trace_events : streams
+  trace_sessions ||--o{ trace_steps : compatibility
   trace_sessions ||--o{ trace_logs : logs
   agents ||--o{ agent_runs : executes
+  agent_runs ||--o{ agent_tool_calls : invokes
   agents ||--o{ agent_memory : remembers
   agents ||--o{ agent_tools : invokes
   benchmark_suites ||--o{ benchmark_runs : executes
+  benchmark_runs ||--o{ benchmark_results : outputs
   benchmark_runs ||--o{ benchmark_scores : scores
   prompt_collections ||--o{ collection_prompts : contains
   prompts ||--o{ collection_prompts : listed
@@ -145,7 +150,7 @@ flowchart LR
 - Prompt/evaluation payloads are validated with Zod.
 - Evaluation responses include estimated input tokens, output tokens, output length, latency, quality sub-scores, and estimated cost.
 - Deployment, workflow, organization, experiment, and audit tables use RLS with owner/member access checks.
-- Unified run, artifact, metric, trace, agent, benchmark, prompt-intelligence, and release tables use RLS with actor/workspace access checks.
+- Unified run, trace-event, trace-node, artifact, metric, agent, benchmark, prompt-intelligence, and release tables use RLS with actor/workspace access checks.
 - Production responses set CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, and COOP.
 - New AI operations tables include RLS policies for actor/member access.
 
@@ -153,11 +158,11 @@ flowchart LR
 
 - Dashboard queries remain scoped by `user_id` or workspace membership.
 - Prompt search uses generated full-text vectors and GIN indexes.
-- Prompt versions, evaluations, experiment results, AI runs, trace steps, benchmark runs, agent runs, deployment history, workflow runs, and audit logs are append-oriented for auditability.
+- Prompt versions, evaluations, experiment results, AI runs, trace events, trace nodes, benchmark results, agent tool calls, deployment history, workflow runs, and audit logs are append-oriented for auditability.
 - Upstash Redis rate limits work across serverless regions.
 - Background job abstraction can be swapped from inline execution to queue workers.
 - Experiment result tables are separated from variants so high-volume benchmark history can be paginated, archived, or moved to warehouse storage.
 - Deployment environments are modeled separately from prompt content so releases can roll back without rewriting prompt history.
 - Workflow run logs are stored separately from workflow definitions so execution history can scale independently.
-- `ai_runs` and `trace_steps` are the partitioning-ready execution event stream for high-volume AI workloads.
+- `ai_runs`, `ai_trace_events`, and `trace_nodes` are the partitioning-ready execution event stream for high-volume AI workloads.
 - Large workspaces should move from load-more UI to cursor pagination backed by `(workspace_id, updated_at, id)` indexes.

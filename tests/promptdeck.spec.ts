@@ -8,7 +8,7 @@ test("runs the demo prompt workflow and opens a shared prompt", async ({ page })
   await page.waitForLoadState("networkidle");
 
   await expect(page.getByRole("heading", { name: "PromptDeck AI" })).toBeVisible();
-  await expect(page.getByText("AI Operations OS v3.0.0")).toBeVisible();
+  await expect(page.getByText("AI Execution OS v3.1.0")).toBeVisible();
 
   await expect(page.getByRole("button", { name: "Use demo" }).first()).toBeEnabled();
   await page.getByRole("button", { name: "Use demo" }).first().click();
@@ -46,7 +46,7 @@ test("runs the demo prompt workflow and opens a shared prompt", async ({ page })
   await expect(page.getByText("Deployment Timeline")).toBeVisible();
 
   await navButton("Observability").click();
-  await expect(page.getByText("Event-driven observability")).toBeVisible();
+  await expect(page.getByText("LangSmith-style trace observability")).toBeVisible();
 
   await page.goto("/share/product-brief");
 

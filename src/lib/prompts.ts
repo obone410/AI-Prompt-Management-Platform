@@ -293,6 +293,34 @@ export type AIMetric = {
   createdAt: string;
 };
 
+export type AITraceEvent = {
+  id: string;
+  runId: string;
+  traceId: string;
+  nodeId: string | null;
+  workspaceId: string;
+  parentEventId: string | null;
+  eventType:
+    | "run.started"
+    | "node.started"
+    | "model.called"
+    | "tool.called"
+    | "artifact.created"
+    | "metric.recorded"
+    | "run.completed"
+    | "run.failed";
+  label: string;
+  level: "info" | "warning" | "error";
+  status: AIRunStatus;
+  latencyMs: number;
+  inputTokenEstimate: number;
+  outputTokenEstimate: number;
+  estimatedCostUsd: number;
+  errorMessage: string | null;
+  metadata: Record<string, string | number | boolean | null>;
+  createdAt: string;
+};
+
 export type AgentType =
   | "research"
   | "support"
@@ -326,10 +354,28 @@ export type AgentRunStep = {
 export type AgentRun = {
   id: string;
   agentId: string;
+  runId: string;
   traceId: string;
   objective: string;
   status: AIRunStatus;
   steps: AgentRunStep[];
+  latencyMs: number;
+  tokenEstimate: number;
+  estimatedCostUsd: number;
+  createdAt: string;
+};
+
+export type AgentToolCall = {
+  id: string;
+  agentRunId: string;
+  runId: string;
+  traceId: string;
+  agentId: string;
+  toolName: string;
+  toolKind: AgentTool["kind"];
+  inputSummary: string;
+  outputSummary: string;
+  status: AIRunStatus;
   latencyMs: number;
   tokenEstimate: number;
   estimatedCostUsd: number;
@@ -377,6 +423,7 @@ export type BenchmarkDataset = {
 export type BenchmarkRun = {
   id: string;
   suiteId: string;
+  runId: string;
   promptId: string;
   model: string;
   datasetId: string;
@@ -386,6 +433,27 @@ export type BenchmarkRun = {
   latencyMs: number;
   estimatedCostUsd: number;
   consistencyScore: number;
+  regressionDelta: number;
+  createdAt: string;
+};
+
+export type BenchmarkResult = {
+  id: string;
+  suiteId: string;
+  benchmarkRunId: string;
+  runId: string;
+  promptId: string;
+  datasetId: string;
+  model: string;
+  taskType: string;
+  correctness: number;
+  hallucinationRate: number;
+  latencyMs: number;
+  estimatedCostUsd: number;
+  consistencyScore: number;
+  rubricScore: number;
+  output: string;
+  expectedOutput: string;
   regressionDelta: number;
   createdAt: string;
 };
@@ -422,6 +490,34 @@ export type TraceStep = {
   latencyMs: number;
   tokenEstimate: number;
   estimatedCostUsd: number;
+  startedAt: string;
+  endedAt: string | null;
+  depth: number;
+};
+
+export type TraceNode = {
+  id: string;
+  traceId: string;
+  runId: string;
+  parentNodeId: string | null;
+  label: string;
+  kind:
+    | "run"
+    | "prompt"
+    | "model"
+    | "tool"
+    | "condition"
+    | "loop"
+    | "parallel"
+    | "artifact"
+    | "release"
+    | "metric";
+  status: AIRunStatus;
+  latencyMs: number;
+  inputTokenEstimate: number;
+  outputTokenEstimate: number;
+  estimatedCostUsd: number;
+  errorMessage: string | null;
   startedAt: string;
   endedAt: string | null;
   depth: number;
@@ -515,17 +611,21 @@ export type PromptWorkspace = {
   organizations: Organization[];
   auditLogs: AuditLog[];
   aiRuns: AIRun[];
+  aiTraceEvents: AITraceEvent[];
   aiArtifacts: AIArtifact[];
   aiMetrics: AIMetric[];
   agents: Agent[];
   agentRuns: AgentRun[];
   agentMemory: AgentMemory[];
   agentTools: AgentTool[];
+  agentToolCalls: AgentToolCall[];
   benchmarkSuites: BenchmarkSuite[];
   benchmarkDatasets: BenchmarkDataset[];
   benchmarkRuns: BenchmarkRun[];
+  benchmarkResults: BenchmarkResult[];
   benchmarkScores: BenchmarkScore[];
   traceSessions: TraceSession[];
+  traceNodes: TraceNode[];
   traceSteps: TraceStep[];
   traceLogs: TraceLog[];
   promptIntelligence: PromptIntelligence[];
@@ -1112,6 +1212,156 @@ export const seedWorkspace: PromptWorkspace = {
       completedAt: "2026-05-15T11:20:00.445Z",
       parentRunId: null,
     },
+    {
+      id: "ai-run-benchmark-claude",
+      workspaceId: "workspace-promptops",
+      entityType: "benchmark",
+      entityId: "benchmark-run-prd-claude",
+      traceId: "trace-benchmark-prd",
+      status: "completed",
+      model: "claude-sonnet-4.5",
+      provider: "demo",
+      latencyMs: 512,
+      inputTokenEstimate: 152,
+      outputTokenEstimate: 88,
+      estimatedCostUsd: 0.002172,
+      qualityScore: 89,
+      startedAt: "2026-05-15T11:21:00.000Z",
+      completedAt: "2026-05-15T11:21:00.512Z",
+      parentRunId: "ai-run-benchmark-prd",
+    },
+    {
+      id: "ai-run-benchmark-gemini",
+      workspaceId: "workspace-promptops",
+      entityType: "benchmark",
+      entityId: "benchmark-run-market-gemini",
+      traceId: "trace-benchmark-prd",
+      status: "completed",
+      model: "gemini-2.5-pro",
+      provider: "demo",
+      latencyMs: 608,
+      inputTokenEstimate: 148,
+      outputTokenEstimate: 102,
+      estimatedCostUsd: 0.00192,
+      qualityScore: 86,
+      startedAt: "2026-05-15T11:22:00.000Z",
+      completedAt: "2026-05-15T11:22:00.608Z",
+      parentRunId: "ai-run-benchmark-prd",
+    },
+    {
+      id: "ai-run-deployment-prd",
+      workspaceId: "workspace-promptops",
+      entityType: "deployment",
+      entityId: "deployment-prd-prod",
+      traceId: "trace-release-prd",
+      status: "completed",
+      model: "system",
+      provider: "system",
+      latencyMs: 160,
+      inputTokenEstimate: 0,
+      outputTokenEstimate: 0,
+      estimatedCostUsd: 0,
+      qualityScore: 94,
+      startedAt: "2026-05-15T10:00:00.000Z",
+      completedAt: "2026-05-15T10:00:00.160Z",
+      parentRunId: null,
+    },
+    {
+      id: "ai-run-experiment-prd",
+      workspaceId: "workspace-promptops",
+      entityType: "experiment",
+      entityId: "experiment-prd-optimization",
+      traceId: "trace-experiment-prd",
+      status: "completed",
+      model: "multi-model",
+      provider: "demo",
+      latencyMs: 855,
+      inputTokenEstimate: 278,
+      outputTokenEstimate: 156,
+      estimatedCostUsd: 0.001908,
+      qualityScore: 91,
+      startedAt: "2026-05-15T09:40:00.000Z",
+      completedAt: "2026-05-15T09:40:00.855Z",
+      parentRunId: null,
+    },
+  ],
+  aiTraceEvents: [
+    {
+      id: "trace-event-agent-start",
+      runId: "ai-run-agent-research",
+      traceId: "trace-agent-research",
+      nodeId: "trace-node-agent-root",
+      workspaceId: "workspace-promptops",
+      parentEventId: null,
+      eventType: "run.started",
+      label: "Research Agent execution started",
+      level: "info",
+      status: "running",
+      latencyMs: 0,
+      inputTokenEstimate: 940,
+      outputTokenEstimate: 0,
+      estimatedCostUsd: 0,
+      errorMessage: null,
+      metadata: { entityType: "agent", model: "gpt-5", provider: "demo" },
+      createdAt: "2026-05-15T11:05:00.000Z",
+    },
+    {
+      id: "trace-event-agent-tool",
+      runId: "ai-run-agent-research",
+      traceId: "trace-agent-research",
+      nodeId: "trace-node-agent-tool",
+      workspaceId: "workspace-promptops",
+      parentEventId: "trace-event-agent-start",
+      eventType: "tool.called",
+      label: "dataset-reader tool call",
+      level: "info",
+      status: "completed",
+      latencyMs: 520,
+      inputTokenEstimate: 160,
+      outputTokenEstimate: 100,
+      estimatedCostUsd: 0.00168,
+      errorMessage: null,
+      metadata: { tool: "dataset-reader", mock: true },
+      createdAt: "2026-05-15T11:05:00.840Z",
+    },
+    {
+      id: "trace-event-agent-complete",
+      runId: "ai-run-agent-research",
+      traceId: "trace-agent-research",
+      nodeId: "trace-node-agent-root",
+      workspaceId: "workspace-promptops",
+      parentEventId: "trace-event-agent-tool",
+      eventType: "run.completed",
+      label: "Research Agent execution completed",
+      level: "info",
+      status: "completed",
+      latencyMs: 2140,
+      inputTokenEstimate: 940,
+      outputTokenEstimate: 620,
+      estimatedCostUsd: 0.00948,
+      errorMessage: null,
+      metadata: { qualityScore: 92 },
+      createdAt: "2026-05-15T11:05:02.140Z",
+    },
+    {
+      id: "trace-event-benchmark-regression",
+      runId: "ai-run-benchmark-gemini",
+      traceId: "trace-benchmark-prd",
+      nodeId: "trace-node-benchmark-regression",
+      workspaceId: "workspace-promptops",
+      parentEventId: null,
+      eventType: "metric.recorded",
+      label: "Regression delta recorded",
+      level: "warning",
+      status: "completed",
+      latencyMs: 0,
+      inputTokenEstimate: 0,
+      outputTokenEstimate: 0,
+      estimatedCostUsd: 0,
+      errorMessage: null,
+      metadata: { regressionDelta: -6, model: "gemini-2.5-pro" },
+      createdAt: "2026-05-15T11:22:00.608Z",
+    },
   ],
   aiArtifacts: [
     {
@@ -1222,6 +1472,7 @@ export const seedWorkspace: PromptWorkspace = {
     {
       id: "agent-run-research-1",
       agentId: "agent-research",
+      runId: "ai-run-agent-research",
       traceId: "trace-agent-research",
       objective: "Synthesize competitor signals for a recruiter-facing PromptDeck AI launch memo.",
       status: "completed",
@@ -1311,6 +1562,24 @@ export const seedWorkspace: PromptWorkspace = {
       status: "mock",
     },
   ],
+  agentToolCalls: [
+    {
+      id: "agent-tool-call-dataset-reader",
+      agentRunId: "agent-run-research-1",
+      runId: "ai-run-agent-research",
+      traceId: "trace-agent-research",
+      agentId: "agent-research",
+      toolName: "dataset-reader",
+      toolKind: "database",
+      inputSummary: "Load benchmark examples and prior experiment scores for product strategy.",
+      outputSummary: "Returned 2 examples, 3 prior model scores, and one regression warning.",
+      status: "completed",
+      latencyMs: 520,
+      tokenEstimate: 260,
+      estimatedCostUsd: 0.00168,
+      createdAt: "2026-05-15T11:05:00.840Z",
+    },
+  ],
   benchmarkSuites: [
     {
       id: "benchmark-suite-prd",
@@ -1357,6 +1626,7 @@ export const seedWorkspace: PromptWorkspace = {
     {
       id: "benchmark-run-prd-gpt",
       suiteId: "benchmark-suite-prd",
+      runId: "ai-run-benchmark-prd",
       promptId: "prompt-prd",
       model: "gpt-5",
       datasetId: "benchmark-dataset-product",
@@ -1372,6 +1642,7 @@ export const seedWorkspace: PromptWorkspace = {
     {
       id: "benchmark-run-prd-claude",
       suiteId: "benchmark-suite-prd",
+      runId: "ai-run-benchmark-claude",
       promptId: "prompt-prd",
       model: "claude-sonnet-4.5",
       datasetId: "benchmark-dataset-product",
@@ -1387,6 +1658,7 @@ export const seedWorkspace: PromptWorkspace = {
     {
       id: "benchmark-run-market-gemini",
       suiteId: "benchmark-suite-prd",
+      runId: "ai-run-benchmark-gemini",
       promptId: "prompt-market",
       model: "gemini-2.5-pro",
       datasetId: "benchmark-dataset-product",
@@ -1396,6 +1668,68 @@ export const seedWorkspace: PromptWorkspace = {
       latencyMs: 608,
       estimatedCostUsd: 0.00192,
       consistencyScore: 84,
+      regressionDelta: -6,
+      createdAt: "2026-05-15T11:22:00.000Z",
+    },
+  ],
+  benchmarkResults: [
+    {
+      id: "benchmark-result-prd-gpt",
+      suiteId: "benchmark-suite-prd",
+      benchmarkRunId: "benchmark-run-prd-gpt",
+      runId: "ai-run-benchmark-prd",
+      promptId: "prompt-prd",
+      datasetId: "benchmark-dataset-product",
+      model: "gpt-5",
+      taskType: "product-strategy",
+      correctness: 92,
+      hallucinationRate: 8,
+      latencyMs: 445,
+      estimatedCostUsd: 0.001115,
+      consistencyScore: 91,
+      rubricScore: 93,
+      output: "Decision-ready PRD with assumptions, risks, success metrics, and non-goals.",
+      expectedOutput: "Decision-ready PRD with assumptions, risks, and metrics.",
+      regressionDelta: 3,
+      createdAt: "2026-05-15T11:20:00.000Z",
+    },
+    {
+      id: "benchmark-result-prd-claude",
+      suiteId: "benchmark-suite-prd",
+      benchmarkRunId: "benchmark-run-prd-claude",
+      runId: "ai-run-benchmark-claude",
+      promptId: "prompt-prd",
+      datasetId: "benchmark-dataset-product",
+      model: "claude-sonnet-4.5",
+      taskType: "product-strategy",
+      correctness: 89,
+      hallucinationRate: 12,
+      latencyMs: 512,
+      estimatedCostUsd: 0.002172,
+      consistencyScore: 88,
+      rubricScore: 89,
+      output: "Well-structured PRD with strong tone and minor gaps in non-goals.",
+      expectedOutput: "Decision-ready PRD with assumptions, risks, and metrics.",
+      regressionDelta: -2,
+      createdAt: "2026-05-15T11:21:00.000Z",
+    },
+    {
+      id: "benchmark-result-market-gemini",
+      suiteId: "benchmark-suite-prd",
+      benchmarkRunId: "benchmark-run-market-gemini",
+      runId: "ai-run-benchmark-gemini",
+      promptId: "prompt-market",
+      datasetId: "benchmark-dataset-product",
+      model: "gemini-2.5-pro",
+      taskType: "product-strategy",
+      correctness: 86,
+      hallucinationRate: 15,
+      latencyMs: 608,
+      estimatedCostUsd: 0.00192,
+      consistencyScore: 84,
+      rubricScore: 84,
+      output: "Market memo with useful experiment ranking but weaker evidence boundaries.",
+      expectedOutput: "Evidence-bound market memo with experiment ranking.",
       regressionDelta: -6,
       createdAt: "2026-05-15T11:22:00.000Z",
     },
@@ -1468,6 +1802,153 @@ export const seedWorkspace: PromptWorkspace = {
       endedAt: "2026-05-15T11:20:00.445Z",
       totalLatencyMs: 445,
       totalCostUsd: 0.001115,
+    },
+    {
+      id: "trace-release-prd",
+      rootRunId: "ai-run-deployment-prd",
+      workspaceId: "workspace-promptops",
+      entityType: "deployment",
+      entityId: "deployment-prd-prod",
+      name: "PRD production release dry run",
+      status: "completed",
+      startedAt: "2026-05-15T10:00:00.000Z",
+      endedAt: "2026-05-15T10:00:00.160Z",
+      totalLatencyMs: 160,
+      totalCostUsd: 0,
+    },
+    {
+      id: "trace-experiment-prd",
+      rootRunId: "ai-run-experiment-prd",
+      workspaceId: "workspace-promptops",
+      entityType: "experiment",
+      entityId: "experiment-prd-optimization",
+      name: "PRD optimization benchmark experiment",
+      status: "completed",
+      startedAt: "2026-05-15T09:40:00.000Z",
+      endedAt: "2026-05-15T09:40:00.855Z",
+      totalLatencyMs: 855,
+      totalCostUsd: 0.001908,
+    },
+  ],
+  traceNodes: [
+    {
+      id: "trace-node-agent-root",
+      traceId: "trace-agent-research",
+      runId: "ai-run-agent-research",
+      parentNodeId: null,
+      label: "Research Agent execution",
+      kind: "run",
+      status: "completed",
+      latencyMs: 2140,
+      inputTokenEstimate: 940,
+      outputTokenEstimate: 620,
+      estimatedCostUsd: 0.00948,
+      errorMessage: null,
+      startedAt: "2026-05-15T11:05:00.000Z",
+      endedAt: "2026-05-15T11:05:02.140Z",
+      depth: 0,
+    },
+    {
+      id: "trace-node-agent-plan",
+      traceId: "trace-agent-research",
+      runId: "ai-run-agent-research",
+      parentNodeId: "trace-node-agent-root",
+      label: "Plan evidence scan",
+      kind: "model",
+      status: "completed",
+      latencyMs: 320,
+      inputTokenEstimate: 140,
+      outputTokenEstimate: 40,
+      estimatedCostUsd: 0.0012,
+      errorMessage: null,
+      startedAt: "2026-05-15T11:05:00.000Z",
+      endedAt: "2026-05-15T11:05:00.320Z",
+      depth: 1,
+    },
+    {
+      id: "trace-node-agent-tool",
+      traceId: "trace-agent-research",
+      runId: "ai-run-agent-research",
+      parentNodeId: "trace-node-agent-plan",
+      label: "dataset-reader tool",
+      kind: "tool",
+      status: "completed",
+      latencyMs: 520,
+      inputTokenEstimate: 160,
+      outputTokenEstimate: 100,
+      estimatedCostUsd: 0.00168,
+      errorMessage: null,
+      startedAt: "2026-05-15T11:05:00.320Z",
+      endedAt: "2026-05-15T11:05:00.840Z",
+      depth: 2,
+    },
+    {
+      id: "trace-node-agent-final",
+      traceId: "trace-agent-research",
+      runId: "ai-run-agent-research",
+      parentNodeId: "trace-node-agent-tool",
+      label: "Final response artifact",
+      kind: "artifact",
+      status: "completed",
+      latencyMs: 1300,
+      inputTokenEstimate: 640,
+      outputTokenEstimate: 480,
+      estimatedCostUsd: 0.0066,
+      errorMessage: null,
+      startedAt: "2026-05-15T11:05:00.840Z",
+      endedAt: "2026-05-15T11:05:02.140Z",
+      depth: 3,
+    },
+    {
+      id: "trace-node-benchmark-root",
+      traceId: "trace-benchmark-prd",
+      runId: "ai-run-benchmark-prd",
+      parentNodeId: null,
+      label: "PRD benchmark suite",
+      kind: "run",
+      status: "completed",
+      latencyMs: 1565,
+      inputTokenEstimate: 456,
+      outputTokenEstimate: 282,
+      estimatedCostUsd: 0.005207,
+      errorMessage: null,
+      startedAt: "2026-05-15T11:20:00.000Z",
+      endedAt: "2026-05-15T11:22:00.608Z",
+      depth: 0,
+    },
+    {
+      id: "trace-node-benchmark-regression",
+      traceId: "trace-benchmark-prd",
+      runId: "ai-run-benchmark-gemini",
+      parentNodeId: "trace-node-benchmark-root",
+      label: "Regression detector",
+      kind: "metric",
+      status: "completed",
+      latencyMs: 42,
+      inputTokenEstimate: 0,
+      outputTokenEstimate: 0,
+      estimatedCostUsd: 0,
+      errorMessage: null,
+      startedAt: "2026-05-15T11:22:00.566Z",
+      endedAt: "2026-05-15T11:22:00.608Z",
+      depth: 1,
+    },
+    {
+      id: "trace-node-release-root",
+      traceId: "trace-release-prd",
+      runId: "ai-run-deployment-prd",
+      parentNodeId: null,
+      label: "Production release dry run",
+      kind: "release",
+      status: "completed",
+      latencyMs: 160,
+      inputTokenEstimate: 0,
+      outputTokenEstimate: 0,
+      estimatedCostUsd: 0,
+      errorMessage: null,
+      startedAt: "2026-05-15T10:00:00.000Z",
+      endedAt: "2026-05-15T10:00:00.160Z",
+      depth: 0,
     },
   ],
   traceSteps: [
@@ -1721,18 +2202,22 @@ export function normalizeWorkspace(workspace: Partial<PromptWorkspace>): PromptW
     organizations: workspace.organizations ?? seedWorkspace.organizations,
     auditLogs: workspace.auditLogs ?? seedWorkspace.auditLogs,
     aiRuns: workspace.aiRuns ?? seedWorkspace.aiRuns,
+    aiTraceEvents: workspace.aiTraceEvents ?? seedWorkspace.aiTraceEvents,
     aiArtifacts: workspace.aiArtifacts ?? seedWorkspace.aiArtifacts,
     aiMetrics: workspace.aiMetrics ?? seedWorkspace.aiMetrics,
     agents: workspace.agents ?? seedWorkspace.agents,
     agentRuns: workspace.agentRuns ?? seedWorkspace.agentRuns,
     agentMemory: workspace.agentMemory ?? seedWorkspace.agentMemory,
     agentTools: workspace.agentTools ?? seedWorkspace.agentTools,
+    agentToolCalls: workspace.agentToolCalls ?? seedWorkspace.agentToolCalls,
     benchmarkSuites: workspace.benchmarkSuites ?? seedWorkspace.benchmarkSuites,
     benchmarkDatasets:
       workspace.benchmarkDatasets ?? seedWorkspace.benchmarkDatasets,
     benchmarkRuns: workspace.benchmarkRuns ?? seedWorkspace.benchmarkRuns,
+    benchmarkResults: workspace.benchmarkResults ?? seedWorkspace.benchmarkResults,
     benchmarkScores: workspace.benchmarkScores ?? seedWorkspace.benchmarkScores,
     traceSessions: workspace.traceSessions ?? seedWorkspace.traceSessions,
+    traceNodes: workspace.traceNodes ?? seedWorkspace.traceNodes,
     traceSteps: workspace.traceSteps ?? seedWorkspace.traceSteps,
     traceLogs: workspace.traceLogs ?? seedWorkspace.traceLogs,
     promptIntelligence:

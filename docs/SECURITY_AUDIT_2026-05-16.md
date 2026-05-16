@@ -2,18 +2,18 @@
 
 Target: `https://ai-prompt-management-platform.vercel.app`
 
-The production alias was checked after the hardened Vercel deployment completed, then refreshed after the v3.0 AI Operations Platform deployment.
+The production alias was checked after the hardened Vercel deployment completed, then refreshed after the v3.1 AI Execution & Observability OS deployment.
 
 ## Scope
 
 - Deployed production website and generated Next.js client assets.
-- Prompt dashboard, public share route, AI testing API route, AI operations command center, benchmark engine, agent builder, release center, and observability center.
+- Prompt dashboard, public share route, AI testing API route, AI execution command center, dataset-level benchmark engine, agent builder, release center, and LangSmith-style observability center.
 - Repository dependency audit and tracked-file secret scan.
 - Vercel production environment configuration presence, without exposing values.
 
 ## Threat Model Summary
 
-Primary assets are user prompts, unified AI runs, trace logs, benchmark results, agent memory, release history, Supabase Auth sessions, Supabase row-level boundaries, the server-only OpenAI key, Vercel deployment settings, and AI usage spend.
+Primary assets are user prompts, unified AI runs, trace events/nodes/logs, benchmark results, agent tool calls and memory, release history, Supabase Auth sessions, Supabase row-level boundaries, the server-only OpenAI key, Vercel deployment settings, and AI usage spend.
 
 Main attacker-controlled inputs are prompt titles, descriptions, bodies, tags, test inputs, share slugs, auth form values, local storage content, and HTTP requests to public routes. The app must preserve owner-only data access, keep provider credentials server-side, expose only intentionally public prompts, and prevent unauthenticated users from spending live AI quota.
 
@@ -60,26 +60,28 @@ Browser QA:
 
 - Homepage status: `200`
 - Share route status: `200`
-- Production title: `PromptDeck AI v3.0 — AI Operations Platform`
-- Version marker visible: `AI Operations OS v3.0.0`
+- Production title: `PromptDeck AI v3.1 — AI Execution OS`
+- Version marker visible: `AI Execution OS v3.1.0`
 - Console errors: `0`
 - Failed requests: `0`
 - 4xx/5xx page asset responses: `0`
 - Demo flow: signed into local demo mode without creating a Supabase account.
 - UI surfaces checked: Operations, Benchmarks, Agents, Workflows, Releases, Observability, Analytics, and Team.
+- v3.1 surfaces checked: unified execution lifecycle, dataset execution results, trace node tree, trace event replay, and agent tool invocation viewer.
 
 Performance spot check:
 
 | Route | DOMContentLoaded | Load | FCP | Transferred |
 | --- | ---: | ---: | ---: | ---: |
-| `/` | 474 ms | 768 ms | 548 ms | 458 KB |
-| `/share/product-brief` | 928 ms | 995 ms | 944 ms | 224 KB |
+| `/` | 390 ms | 574 ms | 468 ms | 461 KB |
+| `/share/product-brief` | 1724 ms | 2083 ms | 1732 ms | 12 KB |
 
 Supabase production schema:
 
 - Migration `ai_operations_platform` applied to project `gujupmdzuonefgliqrdu`.
-- All 16 new v3 tables have RLS enabled.
-- New RLS-protected surfaces include `ai_runs`, `ai_artifacts`, `ai_metrics`, `agents`, `agent_runs`, `agent_memory`, `agent_tools`, `benchmark_suites`, `benchmark_datasets`, `benchmark_runs`, `benchmark_scores`, `trace_sessions`, `trace_steps`, `trace_logs`, `prompt_intelligence`, and `prompt_releases`.
+- Migration `unified_execution_observability` applied to project `gujupmdzuonefgliqrdu`.
+- All 16 v3 operations tables and all 4 new v3.1 execution-observability tables have RLS enabled.
+- RLS-protected execution surfaces include `ai_runs`, `ai_artifacts`, `ai_metrics`, `ai_trace_events`, `trace_sessions`, `trace_steps`, `trace_nodes`, `trace_logs`, `agents`, `agent_runs`, `agent_memory`, `agent_tools`, `agent_tool_calls`, `benchmark_suites`, `benchmark_datasets`, `benchmark_runs`, `benchmark_scores`, `benchmark_results`, `prompt_intelligence`, and `prompt_releases`.
 
 Screenshot artifact:
 

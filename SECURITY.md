@@ -1,6 +1,6 @@
 # Security Notes
 
-PromptDeck AI v3.0 is designed so public keys can be committed only through `.env.example`, while real credentials stay in `.env.local`, Vercel project secrets, or Supabase project settings.
+PromptDeck AI v3.1 is designed so public keys can be committed only through `.env.example`, while real credentials stay in `.env.local`, Vercel project secrets, or Supabase project settings.
 
 ## Implemented Checks
 
@@ -18,7 +18,7 @@ PromptDeck AI v3.0 is designed so public keys can be committed only through `.en
 - OpenTelemetry-compatible spans are emitted through a server-side extension point without exposing collector secrets.
 - Production responses set CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, and COOP headers.
 - Supabase migration enables Row Level Security on all user data tables.
-- RLS policies restrict private prompts, categories, profiles, prompt runs, versions, evaluations, experiments, experiment variants/results, deployments, workflow definitions/runs, agents, agent runs/memory/tools, benchmark suites/runs/scores, trace sessions/steps/logs, unified AI runs/artifacts/metrics, releases, organizations, audit logs, activity, workspace members, and invites.
+- RLS policies restrict private prompts, categories, profiles, prompt runs, versions, evaluations, experiments, experiment variants/results, deployments, workflow definitions/runs, agents, agent runs/memory/tools/tool calls, benchmark suites/runs/results/scores, trace sessions/nodes/events/steps/logs, unified AI runs/artifacts/metrics, releases, organizations, audit logs, activity, workspace members, and invites.
 - Public prompt sharing is exposed through `get_public_prompt_by_slug`, which returns one prompt by slug only when `is_public = true`.
 - Search, category, favorite, share, and run-history indexes are included for large datasets.
 
@@ -35,10 +35,10 @@ PromptDeck AI v3.0 is designed so public keys can be committed only through `.en
 | `experiments` / `experiment_runs` | Creators can write; creators and workspace members can read. |
 | `prompt_deployments` / `deployment_history` | Owners can write; owners and workspace members can read. |
 | `ai_workflows` / `workflow_runs` | Owners can write; owners and workspace members can read. |
-| `ai_runs` / `ai_artifacts` / `ai_metrics` | Actor or workspace member read; actor writes execution records. |
-| `agents` / `agent_runs` / `agent_memory` / `agent_tools` | Actor or workspace member read; actor writes agent operations. |
-| `benchmark_suites` / `benchmark_runs` / `benchmark_scores` | Actor or workspace member read through suite/run access; actor writes benchmark records. |
-| `trace_sessions` / `trace_steps` / `trace_logs` | Actor or workspace member read through trace access; actor writes traces. |
+| `ai_runs` / `ai_trace_events` / `ai_artifacts` / `ai_metrics` | Actor or workspace member read; actor writes execution records. |
+| `agents` / `agent_runs` / `agent_memory` / `agent_tools` / `agent_tool_calls` | Actor or workspace member read; actor writes agent operations. |
+| `benchmark_suites` / `benchmark_runs` / `benchmark_results` / `benchmark_scores` | Actor or workspace member read through suite/run access; actor writes benchmark records. |
+| `trace_sessions` / `trace_nodes` / `trace_steps` / `trace_logs` | Actor or workspace member read through trace access; actor writes traces. |
 | `prompt_intelligence` / `prompt_releases` | Actor or workspace member read; actor writes prompt intelligence and release records. |
 | `organizations` / `organization_members` | Owner-managed organization access. |
 | `audit_logs` | Actor insert; actor or workspace member read. |

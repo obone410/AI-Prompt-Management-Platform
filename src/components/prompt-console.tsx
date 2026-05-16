@@ -66,6 +66,7 @@ import {
   type PromptOptimizationResult,
 } from "@/lib/ai/catalog";
 import { buildPromptDiff } from "@/lib/prompt-diff";
+import { createAIExecution } from "@/lib/ai-execution";
 import {
   extractPromptVariables,
   renderPromptTemplate,
@@ -962,6 +963,8 @@ export function PromptConsole() {
     steps,
     artifactTitle,
     artifactContent,
+    runId,
+    traceId,
   }: {
     entityType: PromptWorkspace["aiRuns"][number]["entityType"];
     entityId: string;
@@ -973,115 +976,31 @@ export function PromptConsole() {
     outputTokens: number;
     cost: number;
     qualityScore: number;
-    steps: { label: string; kind: PromptWorkspace["traceSteps"][number]["kind"] }[];
+    steps: { label: string; kind: PromptWorkspace["traceNodes"][number]["kind"] }[];
     artifactTitle: string;
     artifactContent: string;
+    runId?: string;
+    traceId?: string;
   }) {
-    const startedAt = new Date().toISOString();
-    const completedAt = new Date(Date.now() + latencyMs).toISOString();
-    const workspaceId = activeWorkspace?.id ?? "workspace-promptops";
-    const traceId = promptIdForCurrentMode("trace");
-    const runId = promptIdForCurrentMode("ai-run");
-
-    const run = {
-      id: runId,
-      workspaceId,
-      entityType,
-      entityId,
-      traceId,
-      status: "completed",
-      model,
-      provider,
-      latencyMs,
-      inputTokenEstimate: inputTokens,
-      outputTokenEstimate: outputTokens,
-      estimatedCostUsd: cost,
-      qualityScore,
-      startedAt,
-      completedAt,
-      parentRunId: null,
-    } satisfies PromptWorkspace["aiRuns"][number];
-    const trace = {
-      id: traceId,
-      rootRunId: runId,
-      workspaceId,
+    return createAIExecution({
+      idFactory: promptIdForCurrentMode,
+      workspaceId: activeWorkspace?.id ?? "workspace-promptops",
       entityType,
       entityId,
       name,
-      status: "completed",
-      startedAt,
-      endedAt: completedAt,
-      totalLatencyMs: latencyMs,
-      totalCostUsd: cost,
-    } satisfies PromptWorkspace["traceSessions"][number];
-    const stepIds = steps.map(() => promptIdForCurrentMode("trace-step"));
-    const traceSteps = steps.map((step, index) => ({
-      id: stepIds[index],
-      traceId,
-      parentStepId: index === 0 ? null : stepIds[index - 1],
-      label: step.label,
-      kind: step.kind,
-      status: "completed",
-      latencyMs: Math.max(40, Math.round(latencyMs / Math.max(1, steps.length))),
-      tokenEstimate: Math.round((inputTokens + outputTokens) / Math.max(1, steps.length)),
-      estimatedCostUsd: Number((cost / Math.max(1, steps.length)).toFixed(6)),
-      startedAt,
-      endedAt: completedAt,
-      depth: index,
-    })) satisfies PromptWorkspace["traceSteps"];
-    const artifact = {
-      id: promptIdForCurrentMode("artifact"),
+      model,
+      provider,
+      latencyMs,
+      inputTokens,
+      outputTokens,
+      cost,
+      qualityScore,
+      steps,
+      artifactTitle,
+      artifactContent,
       runId,
-      workspaceId,
-      kind:
-        entityType === "agent"
-          ? "agent_memory"
-          : entityType === "benchmark"
-            ? "benchmark_report"
-            : entityType === "deployment"
-              ? "release_note"
-              : entityType === "workflow"
-                ? "workflow_output"
-                : "prompt_output",
-      title: artifactTitle,
-      content: artifactContent,
-      version: 1,
-      createdAt: completedAt,
-    } satisfies PromptWorkspace["aiArtifacts"][number];
-    const metrics = [
-      {
-        id: promptIdForCurrentMode("metric"),
-        runId,
-        workspaceId,
-        scope: entityType,
-        name: "latency",
-        value: latencyMs,
-        unit: "ms",
-        createdAt: completedAt,
-      },
-      {
-        id: promptIdForCurrentMode("metric"),
-        runId,
-        workspaceId,
-        scope: entityType,
-        name: "quality score",
-        value: qualityScore,
-        unit: "score",
-        createdAt: completedAt,
-      },
-      {
-        id: promptIdForCurrentMode("metric"),
-        runId,
-        workspaceId,
-        scope: entityType,
-        name: "estimated cost",
-        value: cost,
-        unit: "usd",
-        createdAt: completedAt,
-      },
-    ] satisfies PromptWorkspace["aiMetrics"];
-
-    return { run, trace, traceSteps, artifact, metrics };
+      traceId,
+    });
   }
 
   function snapshotPromptVersion(prompt: ManagedPrompt, notes: string) {
@@ -1735,10 +1654,13 @@ export function PromptConsole() {
         ...current,
         runs: [run, ...current.runs],
         aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+        aiTraceEvents: [...operation.traceEvents, ...current.aiTraceEvents].slice(0, 1200),
         aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
         aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
         traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+        traceNodes: [...operation.traceNodes, ...current.traceNodes].slice(0, 1000),
         traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
+        traceLogs: [...operation.traceLogs, ...current.traceLogs].slice(0, 800),
         prompts: current.prompts.map((prompt) =>
           prompt.id === selectedPrompt.id ? updatedPrompt : prompt,
         ),
@@ -1826,6 +1748,10 @@ export function PromptConsole() {
         ...current,
         evaluations: [...evaluations, ...current.evaluations].slice(0, 200),
         aiRuns: [...operations.map((operation) => operation.run), ...current.aiRuns].slice(0, 300),
+        aiTraceEvents: [
+          ...operations.flatMap((operation) => operation.traceEvents),
+          ...current.aiTraceEvents,
+        ].slice(0, 1200),
         aiArtifacts: [
           ...operations.map((operation) => operation.artifact),
           ...current.aiArtifacts,
@@ -1838,9 +1764,17 @@ export function PromptConsole() {
           ...operations.map((operation) => operation.trace),
           ...current.traceSessions,
         ].slice(0, 200),
+        traceNodes: [
+          ...operations.flatMap((operation) => operation.traceNodes),
+          ...current.traceNodes,
+        ].slice(0, 1000),
         traceSteps: [
           ...operations.flatMap((operation) => operation.traceSteps),
           ...current.traceSteps,
+        ].slice(0, 800),
+        traceLogs: [
+          ...operations.flatMap((operation) => operation.traceLogs),
+          ...current.traceLogs,
         ].slice(0, 800),
       }));
       setSelectedTraceId(operations[0]?.trace.id ?? selectedTraceId);
@@ -2022,10 +1956,13 @@ export function PromptConsole() {
           item.id === experiment.id ? updatedExperiment : item,
         ),
         aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+        aiTraceEvents: [...operation.traceEvents, ...current.aiTraceEvents].slice(0, 1200),
         aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
         aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
         traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+        traceNodes: [...operation.traceNodes, ...current.traceNodes].slice(0, 1000),
         traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
+        traceLogs: [...operation.traceLogs, ...current.traceLogs].slice(0, 800),
       }));
       setSelectedTraceId(operation.trace.id);
       recordActivity(
@@ -2085,10 +2022,13 @@ export function PromptConsole() {
         ...current,
         workflowRuns: [run, ...current.workflowRuns].slice(0, 100),
         aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+        aiTraceEvents: [...operation.traceEvents, ...current.aiTraceEvents].slice(0, 1200),
         aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
         aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
         traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+        traceNodes: [...operation.traceNodes, ...current.traceNodes].slice(0, 1000),
         traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
+        traceLogs: [...operation.traceLogs, ...current.traceLogs].slice(0, 800),
         auditLogs: [
           {
             id: createId("audit"),
@@ -2115,9 +2055,15 @@ export function PromptConsole() {
     setAgentRunning(true);
     const timestamp = new Date().toISOString();
     const traceId = promptIdForCurrentMode("trace");
+    const aiRunId = promptIdForCurrentMode("ai-run");
+    const selectedTool =
+      workspace.agentTools.find(
+        (tool) => tool.agentId === agent.id && tool.name === agent.tools[0],
+      ) ?? workspace.agentTools.find((tool) => tool.agentId === agent.id);
     const run = {
       id: promptIdForCurrentMode("agent-run"),
       agentId: agent.id,
+      runId: aiRunId,
       traceId,
       objective: `Execute ${agent.name} against the selected AI operations lifecycle.`,
       status: "completed",
@@ -2173,6 +2119,8 @@ export function PromptConsole() {
       ],
       artifactTitle: `${agent.name} run artifact`,
       artifactContent: run.steps.map((step) => step.detail).join("\n"),
+      runId: aiRunId,
+      traceId,
     });
     const memory = {
       id: promptIdForCurrentMode("memory"),
@@ -2181,17 +2129,37 @@ export function PromptConsole() {
       value: `${agent.name} completed a multi-step execution with ${agent.tools.length} tool abstractions.`,
       updatedAt: timestamp,
     } satisfies PromptWorkspace["agentMemory"][number];
+    const toolCall = {
+      id: promptIdForCurrentMode("agent-tool-call"),
+      agentRunId: run.id,
+      runId: aiRunId,
+      traceId,
+      agentId: agent.id,
+      toolName: selectedTool?.name ?? agent.tools[0] ?? "mock-tool",
+      toolKind: selectedTool?.kind ?? "http",
+      inputSummary: "Selected runtime context, benchmark memory, and execution objective.",
+      outputSummary: "Returned deterministic demo context for the agent reasoning chain.",
+      status: "completed",
+      latencyMs: 520,
+      tokenEstimate: 260,
+      estimatedCostUsd: 0.0011,
+      createdAt: timestamp,
+    } satisfies PromptWorkspace["agentToolCalls"][number];
 
     window.setTimeout(() => {
       setWorkspace((current) => ({
         ...current,
         agentRuns: [run, ...current.agentRuns].slice(0, 100),
         agentMemory: [memory, ...current.agentMemory].slice(0, 100),
+        agentToolCalls: [toolCall, ...current.agentToolCalls].slice(0, 200),
         aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+        aiTraceEvents: [...operation.traceEvents, ...current.aiTraceEvents].slice(0, 1200),
         aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
         aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
         traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+        traceNodes: [...operation.traceNodes, ...current.traceNodes].slice(0, 1000),
         traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
+        traceLogs: [...operation.traceLogs, ...current.traceLogs].slice(0, 800),
       }));
       setSelectedTraceId(operation.trace.id);
       setAgentRunning(false);
@@ -2205,9 +2173,12 @@ export function PromptConsole() {
     const promptId = suite.promptIds[0] ?? selectedPrompt?.id ?? "prompt-prd";
     const model = suite.modelIds[0] ?? "gpt-5";
     const datasetId = suite.datasetIds[0] ?? "benchmark-dataset-product";
+    const dataset = workspace.benchmarkDatasets.find((item) => item.id === datasetId);
+    const aiRunId = promptIdForCurrentMode("ai-run");
     const run = {
       id: promptIdForCurrentMode("benchmark-run"),
       suiteId: suite.id,
+      runId: aiRunId,
       promptId,
       model,
       datasetId,
@@ -2227,6 +2198,28 @@ export function PromptConsole() {
       value: 90,
       createdAt: timestamp,
     } satisfies PromptWorkspace["benchmarkScores"][number];
+    const result = {
+      id: promptIdForCurrentMode("benchmark-result"),
+      suiteId: suite.id,
+      benchmarkRunId: run.id,
+      runId: aiRunId,
+      promptId,
+      datasetId,
+      model,
+      taskType: dataset?.taskType ?? "general",
+      correctness: run.accuracy,
+      hallucinationRate: run.hallucinationRate,
+      latencyMs: run.latencyMs,
+      estimatedCostUsd: run.estimatedCostUsd,
+      consistencyScore: run.consistencyScore,
+      rubricScore: 91,
+      output: "Generated benchmark output with evidence boundaries, metrics, and rollout risk notes.",
+      expectedOutput:
+        dataset?.examples[0]?.expected ??
+        "A high-quality output that satisfies the selected benchmark rubric.",
+      regressionDelta: run.regressionDelta,
+      createdAt: timestamp,
+    } satisfies PromptWorkspace["benchmarkResults"][number];
     const operation = buildOperationTrace({
       entityType: "benchmark",
       entityId: run.id,
@@ -2245,18 +2238,23 @@ export function PromptConsole() {
       ],
       artifactTitle: `${suite.name} report`,
       artifactContent: `Accuracy ${run.accuracy}, hallucination rate ${run.hallucinationRate}, regression delta ${run.regressionDelta}.`,
+      runId: aiRunId,
     });
 
     window.setTimeout(() => {
       setWorkspace((current) => ({
         ...current,
         benchmarkRuns: [run, ...current.benchmarkRuns].slice(0, 120),
+        benchmarkResults: [result, ...current.benchmarkResults].slice(0, 240),
         benchmarkScores: [score, ...current.benchmarkScores].slice(0, 240),
         aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+        aiTraceEvents: [...operation.traceEvents, ...current.aiTraceEvents].slice(0, 1200),
         aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
         aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
         traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+        traceNodes: [...operation.traceNodes, ...current.traceNodes].slice(0, 1000),
         traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
+        traceLogs: [...operation.traceLogs, ...current.traceLogs].slice(0, 800),
       }));
       setSelectedTraceId(operation.trace.id);
       setBenchmarkRunning(false);
@@ -2279,7 +2277,7 @@ export function PromptConsole() {
       environment,
       status: "active",
       deployedBy: session?.email ?? "demo@promptdeck.ai",
-      metadata: `Deployed from PromptDeck AI v3.0.0 to ${environment}.`,
+      metadata: `Deployed from PromptDeck AI v3.1.0 to ${environment}.`,
       createdAt: timestamp,
     };
     const history = {
@@ -2327,10 +2325,13 @@ export function PromptConsole() {
       deploymentHistory: [history, ...current.deploymentHistory],
       promptReleases: [release, ...current.promptReleases],
       aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+      aiTraceEvents: [...operation.traceEvents, ...current.aiTraceEvents].slice(0, 1200),
       aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
       aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
       traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+      traceNodes: [...operation.traceNodes, ...current.traceNodes].slice(0, 1000),
       traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
+      traceLogs: [...operation.traceLogs, ...current.traceLogs].slice(0, 800),
       auditLogs: [
         {
           id: createId("audit"),
@@ -2367,10 +2368,37 @@ export function PromptConsole() {
       createdAt: new Date().toISOString(),
     } satisfies PromptDeployment;
     const prompt = workspace.prompts.find((item) => item.id === deployment.promptId);
+    const operation = buildOperationTrace({
+      entityType: "deployment",
+      entityId: promoted.id,
+      name: `${prompt?.title ?? "Prompt"} promotion to ${targetEnvironment}`,
+      model: prompt?.model ?? "system",
+      provider: "system",
+      latencyMs: 120,
+      inputTokens: 0,
+      outputTokens: 0,
+      cost: 0,
+      qualityScore: 90,
+      steps: [
+        { label: "Read deployment health", kind: "release" },
+        { label: "Promote environment pointer", kind: "release" },
+        { label: "Emit deployment dry-run trace", kind: "artifact" },
+      ],
+      artifactTitle: `${targetEnvironment} promotion trace`,
+      artifactContent: `Promoted ${prompt?.title ?? "prompt"} from ${deployment.environment} to ${targetEnvironment}.`,
+    });
 
     setWorkspace((current) => ({
       ...current,
       deployments: [promoted, ...current.deployments],
+      aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+      aiTraceEvents: [...operation.traceEvents, ...current.aiTraceEvents].slice(0, 1200),
+      aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
+      aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
+      traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+      traceNodes: [...operation.traceNodes, ...current.traceNodes].slice(0, 1000),
+      traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
+      traceLogs: [...operation.traceLogs, ...current.traceLogs].slice(0, 800),
       deploymentHistory: [
         {
           id: promptIdForCurrentMode("deployment-history"),
@@ -2382,18 +2410,46 @@ export function PromptConsole() {
         ...current.deploymentHistory,
       ],
     }));
+    setSelectedTraceId(operation.trace.id);
     showToast(`Promoted to ${targetEnvironment}.`);
   }
 
   function rollbackDeployment(deployment: PromptDeployment) {
     const timestamp = new Date().toISOString();
     const prompt = workspace.prompts.find((item) => item.id === deployment.promptId);
+    const operation = buildOperationTrace({
+      entityType: "deployment",
+      entityId: deployment.id,
+      name: `${prompt?.title ?? "Prompt"} rollback in ${deployment.environment}`,
+      model: prompt?.model ?? "system",
+      provider: "system",
+      latencyMs: 140,
+      inputTokens: 0,
+      outputTokens: 0,
+      cost: 0,
+      qualityScore: 84,
+      steps: [
+        { label: "Locate previous release", kind: "release" },
+        { label: "Repoint environment", kind: "release" },
+        { label: "Write rollback artifact", kind: "artifact" },
+      ],
+      artifactTitle: `${deployment.environment} rollback trace`,
+      artifactContent: `Rolled back ${prompt?.title ?? "prompt"} in ${deployment.environment}.`,
+    });
 
     setWorkspace((current) => ({
       ...current,
       deployments: current.deployments.map((item) =>
         item.id === deployment.id ? { ...item, status: "rolled_back" } : item,
       ),
+      aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+      aiTraceEvents: [...operation.traceEvents, ...current.aiTraceEvents].slice(0, 1200),
+      aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
+      aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
+      traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+      traceNodes: [...operation.traceNodes, ...current.traceNodes].slice(0, 1000),
+      traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
+      traceLogs: [...operation.traceLogs, ...current.traceLogs].slice(0, 800),
       deploymentHistory: [
         {
           id: promptIdForCurrentMode("deployment-history"),
@@ -2405,6 +2461,7 @@ export function PromptConsole() {
         ...current.deploymentHistory,
       ],
     }));
+    setSelectedTraceId(operation.trace.id);
     showToast(`Rolled back ${deployment.environment}.`);
   }
 
@@ -2436,6 +2493,37 @@ export function PromptConsole() {
       }
 
       setOptimization(payload);
+      const operation = buildOperationTrace({
+        entityType: "prompt",
+        entityId: selectedPrompt?.id ?? "draft-prompt",
+        name: `${form.title || selectedPrompt?.title || "Draft prompt"} improvement run`,
+        model: "gpt-5",
+        provider: session?.provider === "Demo" ? "demo" : "openai",
+        latencyMs: 520,
+        inputTokens: Math.max(1, Math.ceil(sourcePrompt.length / 4)),
+        outputTokens: Math.max(1, Math.ceil(payload.improvedPrompt.length / 4)),
+        cost: session?.provider === "Demo" ? 0 : 0.0014,
+        qualityScore: payload.qualityScore,
+        steps: [
+          { label: "Score prompt health", kind: "model" },
+          { label: "Generate improvement suggestions", kind: "model" },
+          { label: "Persist optimization artifact", kind: "artifact" },
+        ],
+        artifactTitle: "Prompt improvement suggestions",
+        artifactContent: payload.suggestions.join("\n"),
+      });
+      setWorkspace((current) => ({
+        ...current,
+        aiRuns: [operation.run, ...current.aiRuns].slice(0, 300),
+        aiTraceEvents: [...operation.traceEvents, ...current.aiTraceEvents].slice(0, 1200),
+        aiArtifacts: [operation.artifact, ...current.aiArtifacts].slice(0, 300),
+        aiMetrics: [...operation.metrics, ...current.aiMetrics].slice(0, 600),
+        traceSessions: [operation.trace, ...current.traceSessions].slice(0, 200),
+        traceNodes: [...operation.traceNodes, ...current.traceNodes].slice(0, 1000),
+        traceSteps: [...operation.traceSteps, ...current.traceSteps].slice(0, 800),
+        traceLogs: [...operation.traceLogs, ...current.traceLogs].slice(0, 800),
+      }));
+      setSelectedTraceId(operation.trace.id);
       recordActivity(
         "prompt.optimized",
         `Generated optimization guidance for ${form.title || selectedPrompt?.title || "draft prompt"}.`,
@@ -2519,10 +2607,10 @@ export function PromptConsole() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0f766e]">
-                    AI Operations OS v3.0.0
+                    AI Execution OS v3.1.0
                   </p>
                   <p className="text-sm font-semibold text-black/55">
-                    Unified LLMOps, agents, traces, benchmarks, and releases
+                    Unified execution, traces, benchmarks, agents, and releases
                   </p>
                 </div>
               </div>
@@ -2530,7 +2618,7 @@ export function PromptConsole() {
                 PromptDeck AI
               </h1>
               <p className="mt-5 max-w-3xl text-lg leading-8 text-black/60 sm:text-xl">
-                A production-grade AI operations platform where prompts, versions,
+                A production-grade AI execution operating system where prompts, versions,
                 experiments, evaluations, workflows, agents, releases, and observability
                 share one execution model.
               </p>
@@ -3319,6 +3407,7 @@ export function PromptConsole() {
             presets={workspace.evaluationPresets}
             benchmarkSuites={workspace.benchmarkSuites}
             benchmarkRuns={workspace.benchmarkRuns}
+            benchmarkResults={workspace.benchmarkResults}
             benchmarkDatasets={workspace.benchmarkDatasets}
             selectedBenchmarkSuite={selectedBenchmarkSuite}
             selectedExperiment={selectedExperiment}
@@ -3365,6 +3454,7 @@ export function PromptConsole() {
             agentRuns={workspace.agentRuns}
             agentMemory={workspace.agentMemory}
             agentTools={workspace.agentTools}
+            agentToolCalls={workspace.agentToolCalls}
             selectedAgent={selectedAgent}
             selectedRun={selectedAgentRun}
             running={agentRunning}
@@ -3394,6 +3484,8 @@ export function PromptConsole() {
             artifacts={workspace.aiArtifacts}
             metrics={workspace.aiMetrics}
             traces={workspace.traceSessions}
+            nodes={workspace.traceNodes}
+            events={workspace.aiTraceEvents}
             steps={workspace.traceSteps}
             logs={workspace.traceLogs}
             selectedTrace={selectedTrace}
@@ -3550,10 +3642,10 @@ function OperationsCommandCenter({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
-              AI operations lifecycle
+              AI execution lifecycle
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-normal">
-              One execution model from prompt idea to production observation.
+              One execution engine for prompts, agents, workflows, benchmarks, and releases.
             </h2>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -3667,6 +3759,7 @@ function ExperimentLab({
   presets,
   benchmarkSuites,
   benchmarkRuns,
+  benchmarkResults,
   benchmarkDatasets,
   selectedBenchmarkSuite,
   selectedExperiment,
@@ -3695,6 +3788,7 @@ function ExperimentLab({
   presets: PromptWorkspace["evaluationPresets"];
   benchmarkSuites: PromptWorkspace["benchmarkSuites"];
   benchmarkRuns: PromptWorkspace["benchmarkRuns"];
+  benchmarkResults: PromptWorkspace["benchmarkResults"];
   benchmarkDatasets: PromptWorkspace["benchmarkDatasets"];
   selectedBenchmarkSuite?: PromptWorkspace["benchmarkSuites"][number];
   selectedExperiment?: PromptExperiment;
@@ -3755,6 +3849,9 @@ function ExperimentLab({
   const selectedBenchmarkRuns = selectedBenchmarkSuite
     ? benchmarkRuns.filter((run) => run.suiteId === selectedBenchmarkSuite.id)
     : benchmarkRuns;
+  const selectedBenchmarkResults = selectedBenchmarkSuite
+    ? benchmarkResults.filter((result) => result.suiteId === selectedBenchmarkSuite.id)
+    : benchmarkResults;
 
   return (
     <section className="grid gap-8 py-8 xl:grid-cols-[340px_minmax(0,1fr)]">
@@ -3972,6 +4069,38 @@ function ExperimentLab({
                       </p>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-black/10 bg-white p-5">
+                <p className="mb-4 text-sm font-semibold">Dataset execution view</p>
+                <div className="space-y-3">
+                  {selectedBenchmarkResults.slice(0, 4).map((result) => (
+                    <div key={result.id} className="rounded-lg border border-black/10 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold">{result.model}</p>
+                          <p className="mt-1 text-xs text-black/50">{result.taskType}</p>
+                        </div>
+                        <span className="rounded-full bg-black px-2 py-1 text-xs font-semibold text-white">
+                          {result.rubricScore}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                        <Info label="Correct" value={`${result.correctness}%`} />
+                        <Info label="Risk" value={`${result.hallucinationRate}%`} />
+                        <Info label="Cost" value={formatCost(result.estimatedCostUsd)} />
+                      </div>
+                      <p className="mt-3 line-clamp-3 text-xs leading-5 text-black/55">
+                        {result.output}
+                      </p>
+                    </div>
+                  ))}
+                  {!selectedBenchmarkResults.length ? (
+                    <p className="rounded-lg border border-dashed border-black/20 p-4 text-sm text-black/55">
+                      Run a benchmark suite to generate dataset-level results.
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -4300,6 +4429,7 @@ function AgentOperationsPanel({
   agentRuns,
   agentMemory,
   agentTools,
+  agentToolCalls,
   selectedAgent,
   selectedRun,
   running,
@@ -4310,6 +4440,7 @@ function AgentOperationsPanel({
   agentRuns: PromptWorkspace["agentRuns"];
   agentMemory: PromptWorkspace["agentMemory"];
   agentTools: PromptWorkspace["agentTools"];
+  agentToolCalls: PromptWorkspace["agentToolCalls"];
   selectedAgent?: PromptWorkspace["agents"][number];
   selectedRun?: PromptWorkspace["agentRuns"][number];
   running: boolean;
@@ -4325,6 +4456,9 @@ function AgentOperationsPanel({
   const visibleRuns = selectedAgent
     ? agentRuns.filter((run) => run.agentId === selectedAgent.id)
     : agentRuns;
+  const visibleToolCalls = selectedAgent
+    ? agentToolCalls.filter((call) => call.agentId === selectedAgent.id)
+    : agentToolCalls;
 
   return (
     <section className="grid gap-6 py-8 xl:grid-cols-[340px_minmax(0,1fr)]">
@@ -4378,7 +4512,7 @@ function AgentOperationsPanel({
               </h2>
               <p className="mt-4 max-w-3xl text-base leading-8 text-black/60">
                 Agents are first-class AI operations entities. Each run writes to
-                the unified run log, creates trace steps, persists memory, and can
+                the unified run log, creates trace nodes/events, persists memory, and can
                 be chained into workflows or benchmarks.
               </p>
             </div>
@@ -4386,7 +4520,7 @@ function AgentOperationsPanel({
               <Metric label="Agents" value={agents.length} />
               <Metric label="Runs" value={agentRuns.length} />
               <Metric label="Tools" value={visibleTools.length} />
-              <Metric label="Memory" value={visibleMemory.length} />
+              <Metric label="Tool calls" value={visibleToolCalls.length} />
             </dl>
           </div>
         </section>
@@ -4448,7 +4582,7 @@ function AgentOperationsPanel({
 
               <div className="space-y-4">
                 <div className="rounded-lg border border-black/10 bg-white p-5">
-                  <p className="mb-3 text-sm font-semibold">Tool call inspector</p>
+                  <p className="mb-3 text-sm font-semibold">Tool invocation viewer</p>
                   <div className="space-y-2">
                     {visibleTools.map((tool) => (
                       <div key={tool.id} className="rounded-lg border border-black/10 p-3">
@@ -4461,6 +4595,33 @@ function AgentOperationsPanel({
                         </p>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-black/10 bg-white p-5">
+                  <p className="mb-3 text-sm font-semibold">Run tool calls</p>
+                  <div className="space-y-2">
+                    {visibleToolCalls.slice(0, 4).map((call) => (
+                      <div key={call.id} className="rounded-lg border border-black/10 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold">{call.toolName}</p>
+                          <span className="tag">{call.status}</span>
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-black/55">
+                          {call.outputSummary}
+                        </p>
+                        <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                          <Info label="Latency" value={`${call.latencyMs}ms`} />
+                          <Info label="Tokens" value={`${call.tokenEstimate}`} />
+                          <Info label="Cost" value={formatCost(call.estimatedCostUsd)} />
+                        </div>
+                      </div>
+                    ))}
+                    {!visibleToolCalls.length ? (
+                      <p className="rounded-lg border border-dashed border-black/20 p-4 text-sm text-black/55">
+                        Agent runs will log tool calls here.
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -4903,6 +5064,8 @@ function ObservabilityCenter({
   artifacts,
   metrics,
   traces,
+  nodes,
+  events,
   steps,
   logs,
   selectedTrace,
@@ -4912,13 +5075,38 @@ function ObservabilityCenter({
   artifacts: PromptWorkspace["aiArtifacts"];
   metrics: PromptWorkspace["aiMetrics"];
   traces: PromptWorkspace["traceSessions"];
+  nodes: PromptWorkspace["traceNodes"];
+  events: PromptWorkspace["aiTraceEvents"];
   steps: PromptWorkspace["traceSteps"];
   logs: PromptWorkspace["traceLogs"];
   selectedTrace?: PromptWorkspace["traceSessions"][number];
   onSelectTrace: (id: string) => void;
 }) {
-  const traceSteps = selectedTrace
-    ? steps.filter((step) => step.traceId === selectedTrace.id)
+  const traceNodes = selectedTrace
+    ? nodes.filter((node) => node.traceId === selectedTrace.id)
+    : [];
+  const traceSteps = selectedTrace ? steps.filter((step) => step.traceId === selectedTrace.id) : [];
+  const visibleNodes = traceNodes.length
+    ? traceNodes
+    : traceSteps.map((step) => ({
+        id: step.id,
+        traceId: step.traceId,
+        runId: selectedTrace?.rootRunId ?? "",
+        parentNodeId: step.parentStepId,
+        label: step.label,
+        kind: step.kind,
+        status: step.status,
+        latencyMs: step.latencyMs,
+        inputTokenEstimate: Math.round(step.tokenEstimate * 0.55),
+        outputTokenEstimate: Math.round(step.tokenEstimate * 0.45),
+        estimatedCostUsd: step.estimatedCostUsd,
+        errorMessage: null,
+        startedAt: step.startedAt,
+        endedAt: step.endedAt,
+        depth: step.depth + 1,
+      })) satisfies PromptWorkspace["traceNodes"];
+  const traceEvents = selectedTrace
+    ? events.filter((event) => event.traceId === selectedTrace.id)
     : [];
   const traceLogs = selectedTrace
     ? logs.filter((log) => log.traceId === selectedTrace.id)
@@ -4984,22 +5172,22 @@ function ObservabilityCenter({
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
-                Event-driven observability
+                LangSmith-style trace observability
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-normal">
-                Trace every prompt, workflow, benchmark, deployment, and agent run.
+                Replay every run as a trace tree with node-level debugging.
               </h2>
               <p className="mt-4 max-w-3xl text-base leading-8 text-black/60">
-                The trace tree shows nested steps, error context, token usage,
-                latency per node, cost breakdown, artifacts, and logs from a
-                single AI operations execution model.
+                The trace tree shows nested sub-runs, error context, token usage,
+                latency per node, cost breakdown, artifacts, event streams, and logs
+                from the same AI execution backbone.
               </p>
             </div>
             <dl className="grid grid-cols-2 gap-3">
               <Metric label="Runs" value={runs.length} />
               <Metric label="Traces" value={traces.length} />
-              <Metric label="Artifacts" value={artifacts.length} />
-              <Metric label="Metrics" value={metrics.length} />
+              <Metric label="Nodes" value={nodes.length} />
+              <Metric label="Events" value={events.length} />
             </dl>
           </div>
         </section>
@@ -5008,27 +5196,33 @@ function ObservabilityCenter({
           <Panel title={selectedTrace.name} icon={Activity}>
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
               <div className="space-y-3">
-                {traceSteps.map((step) => (
+                {visibleNodes.map((node) => (
                   <div
-                    key={step.id}
+                    key={node.id}
                     className="rounded-lg border border-black/10 bg-white p-4"
-                    style={{ marginLeft: `${step.depth * 18}px` }}
+                    style={{ marginLeft: `${node.depth * 14}px` }}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold">{step.label}</p>
+                        <p className="text-sm font-semibold">{node.label}</p>
                         <p className="mt-1 text-xs uppercase tracking-[0.12em] text-black/45">
-                          {step.kind} · {step.status}
+                          {node.kind} · {node.status}
                         </p>
+                        {node.errorMessage ? (
+                          <p className="mt-2 text-xs leading-5 text-[#b91c1c]">
+                            {node.errorMessage}
+                          </p>
+                        ) : null}
                       </div>
                       <span className="rounded-full bg-black px-2 py-1 text-xs font-semibold text-white">
-                        {step.latencyMs}ms
+                        {node.latencyMs}ms
                       </span>
                     </div>
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                      <Info label="Tokens" value={`${step.tokenEstimate}`} />
-                      <Info label="Cost" value={formatCost(step.estimatedCostUsd)} />
-                      <Info label="Depth" value={`${step.depth}`} />
+                    <div className="mt-3 grid grid-cols-4 gap-2 text-xs">
+                      <Info label="Input" value={`${node.inputTokenEstimate}`} />
+                      <Info label="Output" value={`${node.outputTokenEstimate}`} />
+                      <Info label="Cost" value={formatCost(node.estimatedCostUsd)} />
+                      <Info label="Depth" value={`${node.depth}`} />
                     </div>
                   </div>
                 ))}
@@ -5041,6 +5235,10 @@ function ObservabilityCenter({
                   <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                     <Info label="Latency" value={`${selectedTrace.totalLatencyMs}ms`} />
                     <Info label="Cost" value={formatCost(selectedTrace.totalCostUsd)} />
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <Info label="Trace nodes" value={`${visibleNodes.length}`} />
+                    <Info label="Events" value={`${traceEvents.length}`} />
                   </div>
                 </div>
 
@@ -5055,6 +5253,26 @@ function ObservabilityCenter({
                         </p>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-black/10 bg-white p-5">
+                  <p className="mb-3 text-sm font-semibold">Execution timeline replay</p>
+                  <div className="space-y-2">
+                    {traceEvents.slice(0, 6).map((event) => (
+                      <div key={event.id} className="rounded-lg border border-black/10 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0f766e]">
+                          {event.eventType}
+                        </p>
+                        <p className="mt-1 text-sm font-medium">{event.label}</p>
+                        <p className="mt-1 text-xs text-black/50">
+                          {event.latencyMs}ms · {event.inputTokenEstimate + event.outputTokenEstimate} tokens
+                        </p>
+                      </div>
+                    ))}
+                    {!traceEvents.length ? (
+                      <p className="text-sm text-black/55">No trace events for this session.</p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -5210,7 +5428,7 @@ function AnalyticsDashboard({
 }) {
   return (
     <section className="grid gap-4 pb-6 xl:grid-cols-[1.2fr_0.8fr]">
-      <Panel title="Global AI Operations Dashboard" icon={BarChart3}>
+      <Panel title="Global AI Execution Dashboard" icon={BarChart3}>
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="grid gap-3 lg:col-span-2 lg:grid-cols-3">
             <div className="rounded-lg border border-black/10 bg-white p-4">
