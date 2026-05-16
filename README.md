@@ -31,6 +31,7 @@ PromptDeck AI is built as a real working console, not a landing page. It runs lo
 - Export filtered prompts to JSON or Markdown
 - Responsive dashboard UI for desktop and mobile
 - Supabase SQL migration with indexes, triggers, constraints, and RLS policies
+- Slug-scoped public prompt RPC for safer sharing
 - Playwright e2e coverage for the core demo workflow
 
 ## Tech Stack
@@ -64,7 +65,7 @@ This makes the app useful for AI-heavy teams that need repeatable prompt operati
 The Supabase migration lives in:
 
 ```text
-supabase/migrations/202605150001_initial_promptdeck_schema.sql
+supabase/migrations/
 ```
 
 Tables:
@@ -85,6 +86,7 @@ Scale-oriented indexes include:
 - `prompt_runs_user_created_idx`
 
 Row Level Security is enabled on every user data table.
+See `docs/SUPABASE.md` for the policy matrix, migration order, and public sharing RPC.
 
 ## AI Testing Logic
 

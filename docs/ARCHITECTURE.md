@@ -19,6 +19,8 @@ PromptDeck AI is a prompt management workspace for saving, categorizing, testing
 - `prompts`: user-owned prompt records with tags, sharing, favorite state, search vector, and AI settings
 - `prompt_runs`: test history with provider, latency, model, input, and output
 
+Detailed Supabase setup and RLS notes live in `docs/SUPABASE.md`.
+
 ## Scale Notes For 1 Million Users
 
 - User-scoped composite indexes keep dashboard queries bounded by `user_id`.
