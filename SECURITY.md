@@ -1,6 +1,6 @@
 # Security Notes
 
-PromptDeck AI — PromptOps Platform is designed so public keys can be committed only through `.env.example`, while real credentials stay in `.env.local`, Vercel project secrets, or Supabase project settings.
+PromptDeck AI v2.0 is designed so public keys can be committed only through `.env.example`, while real credentials stay in `.env.local`, Vercel project secrets, or Supabase project settings.
 
 ## Implemented Checks
 
@@ -15,9 +15,10 @@ PromptDeck AI — PromptOps Platform is designed so public keys can be committed
 - Explicit demo-mode tests return a deterministic response without calling OpenAI.
 - Claude and Gemini are represented through server-side adapter contracts; no browser-side provider keys are used.
 - Observability hooks keep Sentry/PostHog-style event capture server-side.
+- OpenTelemetry-compatible spans are emitted through a server-side extension point without exposing collector secrets.
 - Production responses set CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, and COOP headers.
 - Supabase migration enables Row Level Security on all user data tables.
-- RLS policies restrict private prompts, categories, profiles, prompt runs, versions, evaluations, experiments, experiment variants/results, activity, workspace members, and invites.
+- RLS policies restrict private prompts, categories, profiles, prompt runs, versions, evaluations, experiments, experiment variants/results, deployments, workflow definitions/runs, organizations, audit logs, activity, workspace members, and invites.
 - Public prompt sharing is exposed through `get_public_prompt_by_slug`, which returns one prompt by slug only when `is_public = true`.
 - Search, category, favorite, share, and run-history indexes are included for large datasets.
 
@@ -31,6 +32,11 @@ PromptDeck AI — PromptOps Platform is designed so public keys can be committed
 | `prompt_runs` | Users can read and delete only their own runs; inserts must reference one of their prompts. |
 | `prompt_versions` | Owners and workspace members can read; owner writes and trigger snapshots preserve history. |
 | `prompt_evaluations` | Owners and workspace members can read; owner writes benchmark results. |
+| `experiments` / `experiment_runs` | Creators can write; creators and workspace members can read. |
+| `prompt_deployments` / `deployment_history` | Owners can write; owners and workspace members can read. |
+| `ai_workflows` / `workflow_runs` | Owners can write; owners and workspace members can read. |
+| `organizations` / `organization_members` | Owner-managed organization access. |
+| `audit_logs` | Actor insert; actor or workspace member read. |
 | `workspaces` | Owners and members can read; owner manages. |
 | `workspace_members` | Workspace members can read; owner manages. |
 | `get_public_prompt_by_slug` | Anonymous and authenticated clients can fetch one public prompt by exact share slug. |

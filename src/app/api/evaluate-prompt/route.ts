@@ -6,6 +6,7 @@ import { modelCatalog } from "@/lib/ai/catalog";
 import { enqueueEvaluationJob } from "@/lib/background-jobs";
 import { captureServerError, captureServerEvent } from "@/lib/observability";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { captureTelemetrySpan } from "@/lib/telemetry";
 
 export const runtime = "nodejs";
 
@@ -60,6 +61,11 @@ export async function POST(request: NextRequest) {
     captureServerEvent("prompt_evaluation_completed", {
       modelCount: parsed.models.length,
       rateLimitSource: rate.source,
+    });
+    captureTelemetrySpan("llmops.evaluation.completed", {
+      modelCount: parsed.models.length,
+      rateLimitSource: rate.source,
+      jobMode: "inline",
     });
 
     return NextResponse.json({

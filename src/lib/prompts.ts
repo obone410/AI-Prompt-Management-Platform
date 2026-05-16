@@ -100,11 +100,138 @@ export type PromptExperiment = {
   promptId: string | null;
   title: string;
   hypothesis: string;
-  status: "draft" | "running" | "completed";
+  status: "draft" | "running" | "completed" | "archived";
   variants: PromptExperimentVariant[];
   results: PromptExperimentResult[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type ExperimentWorkflow = {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string;
+  promptIds: string[];
+  models: string[];
+  datasets: string[];
+  metrics: string[];
+  createdBy: string;
+  status: "draft" | "running" | "completed" | "archived";
+  createdAt: string;
+};
+
+export type ExperimentRun = {
+  id: string;
+  experimentId: string;
+  promptId: string;
+  model: string;
+  dataset: string;
+  clarity: number;
+  correctness: number;
+  hallucinationLikelihood: number;
+  consistency: number;
+  toneAlignment: number;
+  formattingQuality: number;
+  latencyMs: number;
+  tokenEstimate: number;
+  estimatedCostUsd: number;
+  createdAt: string;
+};
+
+export type DeploymentEnvironment = "development" | "staging" | "production";
+
+export type PromptDeployment = {
+  id: string;
+  promptId: string;
+  versionId: string;
+  environment: DeploymentEnvironment;
+  status: "active" | "promoting" | "rolled_back";
+  deployedBy: string;
+  metadata: string;
+  createdAt: string;
+};
+
+export type DeploymentHistory = {
+  id: string;
+  deploymentId: string;
+  action: "deployed" | "promoted" | "rolled_back";
+  summary: string;
+  createdAt: string;
+};
+
+export type WorkflowNodeKind = "prompt" | "variable" | "condition" | "output";
+
+export type AIWorkflowNode = {
+  id: string;
+  kind: WorkflowNodeKind;
+  label: string;
+  promptId: string | null;
+  x: number;
+  y: number;
+  config: string;
+};
+
+export type AIWorkflowEdge = {
+  id: string;
+  from: string;
+  to: string;
+  label: string;
+};
+
+export type AIWorkflow = {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string;
+  variables: string[];
+  nodes: AIWorkflowNode[];
+  edges: AIWorkflowEdge[];
+  status: "draft" | "active" | "paused";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WorkflowRun = {
+  id: string;
+  workflowId: string;
+  status: "queued" | "running" | "completed" | "failed";
+  latencyMs: number;
+  tokenEstimate: number;
+  estimatedCostUsd: number;
+  logs: string[];
+  createdAt: string;
+};
+
+export type EvaluationDataset = {
+  id: string;
+  name: string;
+  description: string;
+  examples: { input: string; expected: string }[];
+  createdAt: string;
+};
+
+export type EvaluationPreset = {
+  id: string;
+  name: string;
+  metrics: string[];
+  rubric: string;
+  createdAt: string;
+};
+
+export type Organization = {
+  id: string;
+  name: string;
+  plan: string;
+  createdAt: string;
+};
+
+export type AuditLog = {
+  id: string;
+  actor: string;
+  action: string;
+  target: string;
+  createdAt: string;
 };
 
 export type PromptActivity = {
@@ -148,6 +275,16 @@ export type PromptWorkspace = {
   versions: PromptVersion[];
   evaluations: PromptEvaluation[];
   experiments: PromptExperiment[];
+  experimentWorkflows: ExperimentWorkflow[];
+  experimentRuns: ExperimentRun[];
+  deployments: PromptDeployment[];
+  deploymentHistory: DeploymentHistory[];
+  aiWorkflows: AIWorkflow[];
+  workflowRuns: WorkflowRun[];
+  evaluationDatasets: EvaluationDataset[];
+  evaluationPresets: EvaluationPreset[];
+  organizations: Organization[];
+  auditLogs: AuditLog[];
   activities: PromptActivity[];
   workspaces: PromptOpsWorkspace[];
   collections: SharedCollection[];
@@ -405,6 +542,228 @@ export const seedWorkspace: PromptWorkspace = {
       updatedAt: "2026-05-15T09:41:00.000Z",
     },
   ],
+  experimentWorkflows: [
+    {
+      id: "experiment-workflow-prd",
+      workspaceId: "workspace-promptops",
+      name: "PRD Generator Benchmark",
+      description:
+        "Compares prompt versions and model adapters against a reusable product-discovery dataset.",
+      promptIds: ["prompt-prd"],
+      models: ["gpt-5", "claude-sonnet-4.5", "gemini-2.5-pro"],
+      datasets: ["Product discovery notes", "Ambiguous founder request"],
+      metrics: ["clarity", "correctness", "hallucination likelihood", "latency", "cost"],
+      createdBy: "demo@promptdeck.ai",
+      status: "completed",
+      createdAt: "2026-05-15T09:32:00.000Z",
+    },
+  ],
+  experimentRuns: [
+    {
+      id: "experiment-run-prd-gpt",
+      experimentId: "experiment-workflow-prd",
+      promptId: "prompt-prd",
+      model: "gpt-5",
+      dataset: "Product discovery notes",
+      clarity: 94,
+      correctness: 89,
+      hallucinationLikelihood: 12,
+      consistency: 91,
+      toneAlignment: 88,
+      formattingQuality: 96,
+      latencyMs: 445,
+      tokenEstimate: 248,
+      estimatedCostUsd: 0.001115,
+      createdAt: "2026-05-15T09:41:00.000Z",
+    },
+    {
+      id: "experiment-run-prd-claude",
+      experimentId: "experiment-workflow-prd",
+      promptId: "prompt-prd",
+      model: "claude-sonnet-4.5",
+      dataset: "Product discovery notes",
+      clarity: 91,
+      correctness: 87,
+      hallucinationLikelihood: 16,
+      consistency: 88,
+      toneAlignment: 93,
+      formattingQuality: 90,
+      latencyMs: 512,
+      tokenEstimate: 261,
+      estimatedCostUsd: 0.002172,
+      createdAt: "2026-05-15T09:42:00.000Z",
+    },
+  ],
+  deployments: [
+    {
+      id: "deployment-prd-prod",
+      promptId: "prompt-prd",
+      versionId: "version-prd-1",
+      environment: "production",
+      status: "active",
+      deployedBy: "demo@promptdeck.ai",
+      metadata: "Promoted after PRD benchmark score exceeded 90.",
+      createdAt: "2026-05-15T10:00:00.000Z",
+    },
+    {
+      id: "deployment-review-staging",
+      promptId: "prompt-review",
+      versionId: "version-prd-1",
+      environment: "staging",
+      status: "active",
+      deployedBy: "demo@promptdeck.ai",
+      metadata: "Staging validation for code-review workflow.",
+      createdAt: "2026-05-15T10:12:00.000Z",
+    },
+  ],
+  deploymentHistory: [
+    {
+      id: "deployment-history-prd-1",
+      deploymentId: "deployment-prd-prod",
+      action: "deployed",
+      summary: "Deployed PRD prompt to Production after experiment pass.",
+      createdAt: "2026-05-15T10:00:00.000Z",
+    },
+    {
+      id: "deployment-history-prd-2",
+      deploymentId: "deployment-prd-prod",
+      action: "promoted",
+      summary: "Promoted from Staging to Production with rollback checkpoint.",
+      createdAt: "2026-05-15T10:04:00.000Z",
+    },
+  ],
+  aiWorkflows: [
+    {
+      id: "workflow-research-brief",
+      workspaceId: "workspace-promptops",
+      name: "Research Brief Pipeline",
+      description:
+        "Chains research synthesis, product framing, quality evaluation, and final output packaging.",
+      variables: ["topic", "audience", "evidence"],
+      nodes: [
+        {
+          id: "node-variable",
+          kind: "variable",
+          label: "Input variables",
+          promptId: null,
+          x: 40,
+          y: 70,
+          config: "{{topic}}, {{audience}}, {{evidence}}",
+        },
+        {
+          id: "node-research",
+          kind: "prompt",
+          label: "Research scan",
+          promptId: "prompt-market",
+          x: 280,
+          y: 70,
+          config: "Summarize evidence and separate inference.",
+        },
+        {
+          id: "node-condition",
+          kind: "condition",
+          label: "Confidence gate",
+          promptId: null,
+          x: 520,
+          y: 70,
+          config: "Continue when evidence confidence >= 80.",
+        },
+        {
+          id: "node-output",
+          kind: "output",
+          label: "Executive brief",
+          promptId: "prompt-prd",
+          x: 760,
+          y: 70,
+          config: "Return final decision brief.",
+        },
+      ],
+      edges: [
+        { id: "edge-1", from: "node-variable", to: "node-research", label: "context" },
+        { id: "edge-2", from: "node-research", to: "node-condition", label: "score" },
+        { id: "edge-3", from: "node-condition", to: "node-output", label: "approved" },
+      ],
+      status: "active",
+      createdAt: "2026-05-15T10:18:00.000Z",
+      updatedAt: "2026-05-15T10:22:00.000Z",
+    },
+  ],
+  workflowRuns: [
+    {
+      id: "workflow-run-research-1",
+      workflowId: "workflow-research-brief",
+      status: "completed",
+      latencyMs: 1280,
+      tokenEstimate: 824,
+      estimatedCostUsd: 0.00492,
+      logs: [
+        "Loaded runtime variables.",
+        "Executed research scan prompt.",
+        "Confidence gate passed at 86.",
+        "Generated executive brief output.",
+      ],
+      createdAt: "2026-05-15T10:25:00.000Z",
+    },
+  ],
+  evaluationDatasets: [
+    {
+      id: "dataset-product-discovery",
+      name: "Product Discovery QA",
+      description: "Reusable evaluation examples for product and strategy workflows.",
+      examples: [
+        {
+          input: "Founder notes about reusable AI prompts and team workflows.",
+          expected: "A structured PRD with scope, risks, metrics, and next experiments.",
+        },
+        {
+          input: "Ambiguous request to improve onboarding conversion.",
+          expected: "Clarifying assumptions, measurable success metrics, and experiment plan.",
+        },
+      ],
+      createdAt: "2026-05-15T09:20:00.000Z",
+    },
+  ],
+  evaluationPresets: [
+    {
+      id: "preset-llmops-quality",
+      name: "LLMOps Quality Rubric",
+      metrics: [
+        "clarity",
+        "correctness",
+        "hallucination likelihood",
+        "consistency",
+        "tone alignment",
+        "formatting quality",
+      ],
+      rubric:
+        "Score each output from 0-100. Penalize unsupported claims, missing structure, and tone drift.",
+      createdAt: "2026-05-15T09:18:00.000Z",
+    },
+  ],
+  organizations: [
+    {
+      id: "org-promptdeck-demo",
+      name: "PromptDeck Demo Org",
+      plan: "Enterprise Simulation",
+      createdAt: "2026-05-15T08:00:00.000Z",
+    },
+  ],
+  auditLogs: [
+    {
+      id: "audit-deployment-prd",
+      actor: "demo@promptdeck.ai",
+      action: "deploy.production",
+      target: "Turn Notes Into a Product Brief",
+      createdAt: "2026-05-15T10:00:00.000Z",
+    },
+    {
+      id: "audit-workflow-run",
+      actor: "demo@promptdeck.ai",
+      action: "workflow.run.completed",
+      target: "Research Brief Pipeline",
+      createdAt: "2026-05-15T10:25:00.000Z",
+    },
+  ],
   activities: [
     {
       id: "activity-seed-1",
@@ -448,6 +807,20 @@ export function normalizeWorkspace(workspace: Partial<PromptWorkspace>): PromptW
     versions: workspace.versions ?? [],
     evaluations: normalizeEvaluations(workspace.evaluations),
     experiments: workspace.experiments ?? seedWorkspace.experiments,
+    experimentWorkflows:
+      workspace.experimentWorkflows ?? seedWorkspace.experimentWorkflows,
+    experimentRuns: workspace.experimentRuns ?? seedWorkspace.experimentRuns,
+    deployments: workspace.deployments ?? seedWorkspace.deployments,
+    deploymentHistory:
+      workspace.deploymentHistory ?? seedWorkspace.deploymentHistory,
+    aiWorkflows: workspace.aiWorkflows ?? seedWorkspace.aiWorkflows,
+    workflowRuns: workspace.workflowRuns ?? seedWorkspace.workflowRuns,
+    evaluationDatasets:
+      workspace.evaluationDatasets ?? seedWorkspace.evaluationDatasets,
+    evaluationPresets:
+      workspace.evaluationPresets ?? seedWorkspace.evaluationPresets,
+    organizations: workspace.organizations ?? seedWorkspace.organizations,
+    auditLogs: workspace.auditLogs ?? seedWorkspace.auditLogs,
     activities: workspace.activities ?? [],
     workspaces: workspace.workspaces ?? seedWorkspace.workspaces,
     collections: workspace.collections ?? seedWorkspace.collections,

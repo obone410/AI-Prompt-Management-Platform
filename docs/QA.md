@@ -14,6 +14,9 @@ Coverage:
 - Demo access was checked for accidental Supabase signup calls; observed signup requests: `0`.
 - AI-assisted prompt optimization renders suggestions in demo mode.
 - Side-by-side model evaluation renders GPT and Claude adapter cards in demo mode.
+- Experiment workflows render lifecycle status, datasets, reusable rubrics, score trends, and benchmark history.
+- Workflow Studio renders prompt, variable, condition, and output nodes with run history and execution logs.
+- Deployment Center renders Development, Staging, and Production lifecycle controls with rollback and promotion actions.
 - Analytics and Team tabs render from the production build.
 - Shared prompt page renders the public prompt preview.
 - Screenshots were refreshed from a production build.
@@ -24,6 +27,8 @@ Artifacts:
 
 - `docs/screenshots/dashboard-desktop.png`
 - `docs/screenshots/experiments-desktop.png`
+- `docs/screenshots/workflows-desktop.png`
+- `docs/screenshots/deployments-desktop.png`
 - `docs/screenshots/dashboard-mobile.png`
 - `docs/screenshots/shared-prompt.png`
 - `docs/screenshots/live-production-security.png`

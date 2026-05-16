@@ -111,5 +111,5 @@ Remaining `npm outdated` entries are major-version dev/runtime-type tracks held 
 
 - Vercel Production and Development environment variables are configured; Preview variables were not present in the CLI listing and should be added before preview deployments are used.
 - Supabase public browser keys are not secrets. RLS and the slug-scoped RPC remain the protection boundary.
-- For 1 million users, replace the in-memory API limiter with a durable distributed limiter such as Vercel KV, Upstash Redis, or a Supabase-backed token bucket.
+- For 1 million users, keep `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` configured in production so rate limiting remains distributed across serverless instances. The local in-memory limiter is only a development fallback.
 - Keep OpenAI billing/quota healthy before relying on live provider tests in recruiter demos.

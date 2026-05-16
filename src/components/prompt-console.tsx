@@ -3,9 +3,11 @@
 import {
   Activity,
   BarChart3,
+  Blocks,
   Brain,
   CircleDollarSign,
   Bot,
+  Building2,
   Check,
   Clipboard,
   Command,
@@ -14,6 +16,8 @@ import {
   ExternalLink,
   Eye,
   Filter,
+  Gauge,
+  GitBranch,
   Heart,
   History,
   Layers3,
@@ -26,6 +30,7 @@ import {
   Plus,
   Save,
   Search,
+  Rocket,
   Share2,
   ShieldCheck,
   Sparkles,
@@ -46,8 +51,6 @@ import {
   Cell,
   Line,
   LineChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -79,6 +82,9 @@ import {
   type PromptExperiment,
   type PromptExperimentResult,
   type PromptExperimentVariant,
+  type AIWorkflow,
+  type DeploymentEnvironment,
+  type PromptDeployment,
   type PromptRun,
   type PromptVersion,
   type PromptWorkspace,
@@ -111,7 +117,13 @@ type TestResult = {
   latencyMs: number;
 };
 
-type ActiveView = "operate" | "experiments" | "analytics" | "team";
+type ActiveView =
+  | "operate"
+  | "experiments"
+  | "workflows"
+  | "deployments"
+  | "analytics"
+  | "team";
 
 type EvaluationTab = "output" | "metrics" | "notes";
 
@@ -511,7 +523,11 @@ export function PromptConsole() {
   const [selectedExperimentId, setSelectedExperimentId] = useState(
     "experiment-prd-optimization",
   );
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState("workflow-research-brief");
+  const [deploymentEnvironment, setDeploymentEnvironment] =
+    useState<DeploymentEnvironment>("production");
   const [experimentRunning, setExperimentRunning] = useState(false);
+  const [workflowRunning, setWorkflowRunning] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
   const [optimization, setOptimization] = useState<PromptOptimizationResult | null>(null);
   const [inviteEmail, setInviteEmail] = useState("teammate@company.com");
@@ -607,6 +623,14 @@ export function PromptConsole() {
 
       if (event.key.toLowerCase() === "e") {
         setActiveView("experiments");
+      }
+
+      if (event.key.toLowerCase() === "w") {
+        setActiveView("workflows");
+      }
+
+      if (event.key.toLowerCase() === "d") {
+        setActiveView("deployments");
       }
     }
 
@@ -733,6 +757,12 @@ export function PromptConsole() {
   const selectedExperiment =
     workspace.experiments.find((experiment) => experiment.id === selectedExperimentId) ??
     workspace.experiments[0];
+  const selectedWorkflow =
+    workspace.aiWorkflows.find((workflow) => workflow.id === selectedWorkflowId) ??
+    workspace.aiWorkflows[0];
+  const activeDeployments = workspace.deployments.filter(
+    (deployment) => deployment.environment === deploymentEnvironment,
+  );
   const analytics = useMemo(() => {
     const categoryUsage = workspace.categories.map((category) => ({
       name: category.name,
@@ -753,14 +783,83 @@ export function PromptConsole() {
     const favoritePrompts = workspace.prompts
       .filter((prompt) => prompt.isFavorite)
       .map((prompt) => ({ name: prompt.title.slice(0, 18), runs: prompt.usageCount }));
+    const providerUsage = modelCatalog.map((model) => {
+      const evaluationCost = workspace.evaluations
+        .filter((evaluation) => evaluation.model === model.id)
+        .reduce((total, evaluation) => total + evaluation.estimatedCostUsd, 0);
+      const experimentCost = workspace.experimentRuns
+        .filter((run) => run.model === model.id)
+        .reduce((total, run) => total + run.estimatedCostUsd, 0);
+      const totalRuns =
+        workspace.evaluations.filter((evaluation) => evaluation.model === model.id).length +
+        workspace.experimentRuns.filter((run) => run.model === model.id).length;
+      const avgLatencyItems = [
+        ...workspace.evaluations.filter((evaluation) => evaluation.model === model.id),
+        ...workspace.experimentRuns.filter((run) => run.model === model.id),
+      ];
+      const averageLatency =
+        avgLatencyItems.length > 0
+          ? Math.round(
+              avgLatencyItems.reduce((total, item) => total + item.latencyMs, 0) /
+                avgLatencyItems.length,
+            )
+          : 0;
+
+      return {
+        name: model.label,
+        cost: Number((evaluationCost + experimentCost).toFixed(6)),
+        runs: totalRuns,
+        latency: averageLatency,
+        provider: model.provider,
+      };
+    });
+    const monthlyUsage = [
+      ...workspace.evaluations.map((evaluation) => ({
+        month: new Date(evaluation.createdAt).toLocaleString("en-US", { month: "short" }),
+        tokens: evaluation.tokenEstimate,
+        cost: evaluation.estimatedCostUsd,
+      })),
+      ...workspace.experimentRuns.map((run) => ({
+        month: new Date(run.createdAt).toLocaleString("en-US", { month: "short" }),
+        tokens: run.tokenEstimate,
+        cost: run.estimatedCostUsd,
+      })),
+      ...workspace.workflowRuns.map((run) => ({
+        month: new Date(run.createdAt).toLocaleString("en-US", { month: "short" }),
+        tokens: run.tokenEstimate,
+        cost: run.estimatedCostUsd,
+      })),
+    ].reduce<{ month: string; tokens: number; cost: number }[]>((items, item) => {
+      const existing = items.find((entry) => entry.month === item.month);
+      if (existing) {
+        existing.tokens += item.tokens;
+        existing.cost = Number((existing.cost + item.cost).toFixed(6));
+      } else {
+        items.push({ ...item });
+      }
+      return items;
+    }, []);
+    const cheapestProvider = providerUsage
+      .filter((item) => item.cost > 0)
+      .sort((a, b) => a.cost - b.cost)[0]?.name ?? "Pending";
+    const fastestProvider = providerUsage
+      .filter((item) => item.latency > 0)
+      .sort((a, b) => a.latency - b.latency)[0]?.name ?? "Pending";
 
     return {
       categoryUsage,
       latencyEvents,
       favoritePrompts,
+      providerUsage,
+      monthlyUsage,
+      cheapestProvider,
+      fastestProvider,
       totalEstimatedCost: workspace.evaluations.reduce(
         (total, evaluation) => total + evaluation.estimatedCostUsd,
-        0,
+        workspace.experimentRuns.reduce(
+          (total, run) => total + run.estimatedCostUsd,
+          workspace.workflowRuns.reduce((total, run) => total + run.estimatedCostUsd, 0),
+        ),
       ),
       averageLatency:
         latencyEvents.length > 0
@@ -770,7 +869,14 @@ export function PromptConsole() {
             )
           : 0,
     };
-  }, [workspace.categories, workspace.evaluations, workspace.prompts, workspace.runs]);
+  }, [
+    workspace.categories,
+    workspace.evaluations,
+    workspace.experimentRuns,
+    workspace.prompts,
+    workspace.runs,
+    workspace.workflowRuns,
+  ]);
 
   const stats = {
     prompts: workspace.prompts.length,
@@ -778,6 +884,8 @@ export function PromptConsole() {
     shared: workspace.prompts.filter((prompt) => prompt.isPublic).length,
     tests: workspace.runs.length + workspace.evaluations.length,
     experiments: workspace.experiments.length,
+    workflows: workspace.aiWorkflows.length,
+    deployments: workspace.deployments.length,
   };
 
   function showToast(message: string) {
@@ -1663,6 +1771,155 @@ export function PromptConsole() {
     }
   }
 
+  function runWorkflow(workflow: AIWorkflow) {
+    setWorkflowRunning(true);
+    const timestamp = new Date().toISOString();
+    const run = {
+      id: promptIdForCurrentMode("workflow-run"),
+      workflowId: workflow.id,
+      status: "completed",
+      latencyMs: 900 + workflow.nodes.length * 140,
+      tokenEstimate: 420 + workflow.nodes.length * 95,
+      estimatedCostUsd: Number((0.0018 + workflow.nodes.length * 0.00084).toFixed(6)),
+      logs: [
+        "Queued workflow execution.",
+        ...workflow.nodes.map((node) => `Executed ${node.kind} node: ${node.label}.`),
+        "Stored workflow output and telemetry.",
+      ],
+      createdAt: timestamp,
+    } satisfies PromptWorkspace["workflowRuns"][number];
+
+    window.setTimeout(() => {
+      setWorkspace((current) => ({
+        ...current,
+        workflowRuns: [run, ...current.workflowRuns].slice(0, 100),
+        auditLogs: [
+          {
+            id: createId("audit"),
+            actor: session?.email ?? "demo@promptdeck.ai",
+            action: "workflow.run.completed",
+            target: workflow.name,
+            createdAt: timestamp,
+          },
+          ...current.auditLogs,
+        ],
+      }));
+      recordActivity(
+        "workflow.completed",
+        `Completed ${workflow.name} with ${workflow.nodes.length} nodes.`,
+        workflow.nodes.find((node) => node.promptId)?.promptId,
+      );
+      setWorkflowRunning(false);
+      showToast("Workflow run complete.");
+    }, 450);
+  }
+
+  function deploySelectedPrompt(environment: DeploymentEnvironment) {
+    if (!selectedPrompt) {
+      showToast("Select a prompt before deploying.");
+      return;
+    }
+
+    const timestamp = new Date().toISOString();
+    const version = latestVersion ?? snapshotPromptVersion(selectedPrompt, "Deployment snapshot.");
+    const deployment: PromptDeployment = {
+      id: promptIdForCurrentMode("deployment"),
+      promptId: selectedPrompt.id,
+      versionId: version.id,
+      environment,
+      status: "active",
+      deployedBy: session?.email ?? "demo@promptdeck.ai",
+      metadata: `Deployed from PromptDeck AI v2.0.0 to ${environment}.`,
+      createdAt: timestamp,
+    };
+    const history = {
+      id: promptIdForCurrentMode("deployment-history"),
+      deploymentId: deployment.id,
+      action: "deployed",
+      summary: `Deployed ${selectedPrompt.title} to ${environment}.`,
+      createdAt: timestamp,
+    } satisfies PromptWorkspace["deploymentHistory"][number];
+
+    setWorkspace((current) => ({
+      ...current,
+      deployments: [deployment, ...current.deployments],
+      deploymentHistory: [history, ...current.deploymentHistory],
+      auditLogs: [
+        {
+          id: createId("audit"),
+          actor: deployment.deployedBy,
+          action: `deploy.${environment}`,
+          target: selectedPrompt.title,
+          createdAt: timestamp,
+        },
+        ...current.auditLogs,
+      ],
+      versions: latestVersion ? current.versions : [version, ...current.versions],
+    }));
+    recordActivity(
+      "deployment.created",
+      `Deployed ${selectedPrompt.title} to ${environment}.`,
+      selectedPrompt.id,
+    );
+    showToast(`Deployed to ${environment}.`);
+  }
+
+  function promoteDeployment(deployment: PromptDeployment) {
+    const targetEnvironment =
+      deployment.environment === "development"
+        ? "staging"
+        : deployment.environment === "staging"
+          ? "production"
+          : "production";
+    const promoted = {
+      ...deployment,
+      id: promptIdForCurrentMode("deployment"),
+      environment: targetEnvironment,
+      status: "active",
+      createdAt: new Date().toISOString(),
+    } satisfies PromptDeployment;
+    const prompt = workspace.prompts.find((item) => item.id === deployment.promptId);
+
+    setWorkspace((current) => ({
+      ...current,
+      deployments: [promoted, ...current.deployments],
+      deploymentHistory: [
+        {
+          id: promptIdForCurrentMode("deployment-history"),
+          deploymentId: promoted.id,
+          action: "promoted",
+          summary: `Promoted ${prompt?.title ?? "prompt"} to ${targetEnvironment}.`,
+          createdAt: promoted.createdAt,
+        },
+        ...current.deploymentHistory,
+      ],
+    }));
+    showToast(`Promoted to ${targetEnvironment}.`);
+  }
+
+  function rollbackDeployment(deployment: PromptDeployment) {
+    const timestamp = new Date().toISOString();
+    const prompt = workspace.prompts.find((item) => item.id === deployment.promptId);
+
+    setWorkspace((current) => ({
+      ...current,
+      deployments: current.deployments.map((item) =>
+        item.id === deployment.id ? { ...item, status: "rolled_back" } : item,
+      ),
+      deploymentHistory: [
+        {
+          id: promptIdForCurrentMode("deployment-history"),
+          deploymentId: deployment.id,
+          action: "rolled_back",
+          summary: `Rolled back ${prompt?.title ?? "prompt"} in ${deployment.environment}.`,
+          createdAt: timestamp,
+        },
+        ...current.deploymentHistory,
+      ],
+    }));
+    showToast(`Rolled back ${deployment.environment}.`);
+  }
+
   async function improvePrompt() {
     const sourcePrompt = form.content || selectedPrompt?.content;
 
@@ -1754,6 +2011,8 @@ export function PromptConsole() {
   const viewTabs: { view: ActiveView; icon: LucideIcon; label: string }[] = [
     { view: "operate", icon: LayoutDashboard, label: "Operate" },
     { view: "experiments", icon: Workflow, label: "Experiments" },
+    { view: "workflows", icon: Blocks, label: "Workflows" },
+    { view: "deployments", icon: Rocket, label: "Deploy" },
     { view: "analytics", icon: BarChart3, label: "Analytics" },
     { view: "team", icon: Users, label: "Team" },
   ];
@@ -1770,10 +2029,10 @@ export function PromptConsole() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0f766e]">
-                    PromptOps Platform
+                    AI Workflow OS v2.0.0
                   </p>
                   <p className="text-sm font-semibold text-black/55">
-                    LLM operations, experiments, and workflow infrastructure
+                    LLMOps, experiments, deployments, and workflow infrastructure
                   </p>
                 </div>
               </div>
@@ -1781,8 +2040,8 @@ export function PromptConsole() {
                 PromptDeck AI
               </h1>
               <p className="mt-5 max-w-3xl text-lg leading-8 text-black/60 sm:text-xl">
-                A premium AI workspace for prompt versions, model evaluations,
-                experiments, cost visibility, and team-ready PromptOps workflows.
+                A venture-scale AI workflow operating system for prompt lifecycle,
+                experiments, evaluation infrastructure, deployments, and inference operations.
               </p>
               <div className="mt-6 flex flex-wrap gap-2">
                 <StatusBadge icon={ServerCog} label="Redis rate limits" />
@@ -1795,6 +2054,8 @@ export function PromptConsole() {
             <div className="grid min-w-[260px] gap-3 sm:grid-cols-2 lg:grid-cols-1">
               <Metric label="Prompts" value={stats.prompts} />
               <Metric label="Experiments" value={stats.experiments} />
+              <Metric label="Workflows" value={stats.workflows} />
+              <Metric label="Deployments" value={stats.deployments} />
             </div>
           </div>
 
@@ -1859,7 +2120,7 @@ export function PromptConsole() {
             );
           })}
           <span className="ml-auto hidden text-xs font-medium uppercase tracking-[0.16em] text-black/40 lg:inline">
-            N new / E experiments / A analytics / Cmd+K command
+            N new / E experiments / W workflows / D deploy / Cmd+K
           </span>
         </nav>
 
@@ -2551,6 +2812,10 @@ export function PromptConsole() {
         {activeView === "experiments" ? (
           <ExperimentLab
             experiments={workspace.experiments}
+            experimentWorkflows={workspace.experimentWorkflows}
+            experimentRuns={workspace.experimentRuns}
+            datasets={workspace.evaluationDatasets}
+            presets={workspace.evaluationPresets}
             selectedExperiment={selectedExperiment}
             selectedPrompt={selectedPrompt}
             evaluationModels={evaluationModels}
@@ -2575,6 +2840,31 @@ export function PromptConsole() {
           />
         ) : null}
 
+        {activeView === "workflows" ? (
+          <WorkflowStudio
+            workflows={workspace.aiWorkflows}
+            selectedWorkflow={selectedWorkflow}
+            runs={workspace.workflowRuns}
+            running={workflowRunning}
+            onSelectWorkflow={setSelectedWorkflowId}
+            onRunWorkflow={runWorkflow}
+          />
+        ) : null}
+
+        {activeView === "deployments" ? (
+          <DeploymentCenter
+            prompts={workspace.prompts}
+            versions={workspace.versions}
+            deployments={activeDeployments}
+            history={workspace.deploymentHistory}
+            environment={deploymentEnvironment}
+            onEnvironmentChange={setDeploymentEnvironment}
+            onDeploy={deploySelectedPrompt}
+            onPromote={promoteDeployment}
+            onRollback={rollbackDeployment}
+          />
+        ) : null}
+
         {activeView === "analytics" ? (
           <AnalyticsDashboard analytics={analytics} activities={workspace.activities} />
         ) : null}
@@ -2584,6 +2874,8 @@ export function PromptConsole() {
             workspaceName={activeWorkspace?.name ?? "PromptOps Lab"}
             collections={workspace.collections}
             members={workspace.members}
+            organizations={workspace.organizations}
+            auditLogs={workspace.auditLogs}
             inviteEmail={inviteEmail}
             onInviteEmailChange={setInviteEmail}
             onInvite={inviteMember}
@@ -2612,6 +2904,21 @@ export function PromptConsole() {
             icon: Workflow,
             run: () => setActiveView("experiments"),
           },
+          {
+            label: "Open workflow studio",
+            icon: Blocks,
+            run: () => setActiveView("workflows"),
+          },
+          {
+            label: "Open deployments",
+            icon: Rocket,
+            run: () => setActiveView("deployments"),
+          },
+          {
+            label: "Run selected workflow",
+            icon: Sparkles,
+            run: () => selectedWorkflow && runWorkflow(selectedWorkflow),
+          },
           { label: "Open analytics", icon: Activity, run: () => setActiveView("analytics") },
           { label: "Open team workspace", icon: Users, run: () => setActiveView("team") },
         ]}
@@ -2629,6 +2936,10 @@ export function PromptConsole() {
 
 function ExperimentLab({
   experiments,
+  experimentWorkflows,
+  experimentRuns,
+  datasets,
+  presets,
   selectedExperiment,
   selectedPrompt,
   evaluationModels,
@@ -2646,6 +2957,10 @@ function ExperimentLab({
   onToggleModel,
 }: {
   experiments: PromptExperiment[];
+  experimentWorkflows: PromptWorkspace["experimentWorkflows"];
+  experimentRuns: PromptWorkspace["experimentRuns"];
+  datasets: PromptWorkspace["evaluationDatasets"];
+  presets: PromptWorkspace["evaluationPresets"];
   selectedExperiment?: PromptExperiment;
   selectedPrompt?: ManagedPrompt;
   evaluationModels: string[];
@@ -2672,6 +2987,22 @@ function ExperimentLab({
     ? Math.round(results.reduce((total, item) => total + item.latencyMs, 0) / results.length)
     : 0;
   const totalCost = results.reduce((total, item) => total + item.estimatedCostUsd, 0);
+  const averageRunScore = experimentRuns.length
+    ? Math.round(
+        experimentRuns.reduce(
+          (total, run) =>
+            total +
+            (run.clarity +
+              run.correctness +
+              (100 - run.hallucinationLikelihood) +
+              run.consistency +
+              run.toneAlignment +
+              run.formattingQuality) /
+              6,
+          0,
+        ) / experimentRuns.length,
+      )
+    : 0;
 
   return (
     <section className="grid gap-8 py-8 xl:grid-cols-[340px_minmax(0,1fr)]">
@@ -2724,6 +3055,32 @@ function ExperimentLab({
             ))}
           </div>
         </Panel>
+
+        <Panel title="Evaluation Infrastructure" icon={Gauge}>
+          <div className="space-y-3">
+            {presets.map((preset) => (
+              <div key={preset.id} className="rounded-lg border border-black/10 bg-white p-4">
+                <p className="text-sm font-semibold">{preset.name}</p>
+                <p className="mt-2 text-sm leading-6 text-black/60">{preset.rubric}</p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {preset.metrics.slice(0, 4).map((metric) => (
+                    <span key={metric} className="tag">
+                      {metric}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {datasets.map((dataset) => (
+              <div key={dataset.id} className="rounded-lg border border-black/10 bg-white p-4">
+                <p className="text-sm font-semibold">{dataset.name}</p>
+                <p className="mt-1 text-sm text-black/55">
+                  {dataset.examples.length} reusable examples
+                </p>
+              </div>
+            ))}
+          </div>
+        </Panel>
       </aside>
 
       <div className="min-w-0 space-y-8">
@@ -2749,6 +3106,56 @@ function ExperimentLab({
             </dl>
           </div>
         </section>
+
+        <Panel title="Experiment Workflows" icon={GitBranch}>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {experimentWorkflows.map((workflow) => (
+              <article
+                key={workflow.id}
+                className="rounded-lg border border-black/10 bg-white p-5"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f766e]">
+                      {workflow.status}
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold">{workflow.name}</h3>
+                  </div>
+                  <span className="rounded-full bg-black px-3 py-1 text-xs font-semibold text-white">
+                    {workflow.models.length} models
+                  </span>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-black/60">
+                  {workflow.description}
+                </p>
+                <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+                  <Info label="Prompts" value={`${workflow.promptIds.length}`} />
+                  <Info label="Datasets" value={`${workflow.datasets.length}`} />
+                  <Info label="Avg score" value={`${averageRunScore}/100`} />
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="mt-5 h-72 rounded-lg border border-black/10 bg-white p-4">
+            <p className="mb-3 text-sm font-semibold">Benchmark performance trends</p>
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={experimentRuns}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="model" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} />
+                <Tooltip />
+                <Line type="monotone" dataKey="clarity" stroke="#0f766e" strokeWidth={2} />
+                <Line type="monotone" dataKey="correctness" stroke="#2563eb" strokeWidth={2} />
+                <Line
+                  type="monotone"
+                  dataKey="formattingQuality"
+                  stroke="#b45309"
+                  strokeWidth={2}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Panel>
 
         {selectedExperiment ? (
           <Panel title={selectedExperiment.title} icon={Workflow}>
@@ -2994,6 +3401,320 @@ function ExperimentResultCard({ result }: { result: PromptExperimentResult }) {
   );
 }
 
+function WorkflowStudio({
+  workflows,
+  selectedWorkflow,
+  runs,
+  running,
+  onSelectWorkflow,
+  onRunWorkflow,
+}: {
+  workflows: AIWorkflow[];
+  selectedWorkflow?: AIWorkflow;
+  runs: PromptWorkspace["workflowRuns"];
+  running: boolean;
+  onSelectWorkflow: (id: string) => void;
+  onRunWorkflow: (workflow: AIWorkflow) => void;
+}) {
+  const workflowRuns = runs.filter((run) => run.workflowId === selectedWorkflow?.id);
+
+  return (
+    <section className="grid gap-8 py-8 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <aside className="space-y-6">
+        <Panel title="Workflow Library" icon={Blocks}>
+          <div className="space-y-3">
+            {workflows.map((workflow) => (
+              <button
+                key={workflow.id}
+                className={clsx(
+                  "block w-full rounded-lg border p-4 text-left",
+                  selectedWorkflow?.id === workflow.id
+                    ? "border-black bg-white"
+                    : "border-black/10 bg-white/70 hover:bg-white",
+                )}
+                onClick={() => onSelectWorkflow(workflow.id)}
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f766e]">
+                  {workflow.status}
+                </p>
+                <p className="mt-2 text-base font-semibold">{workflow.name}</p>
+                <p className="mt-2 line-clamp-3 text-sm leading-6 text-black/60">
+                  {workflow.description}
+                </p>
+              </button>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="Workflow Analytics" icon={Gauge}>
+          <dl className="grid grid-cols-2 gap-3">
+            <Metric label="Runs" value={workflowRuns.length} />
+            <Metric
+              label="Nodes"
+              value={selectedWorkflow?.nodes.length ?? 0}
+            />
+            <CostMetric
+              label="Spend"
+              value={workflowRuns.reduce((total, run) => total + run.estimatedCostUsd, 0)}
+            />
+            <Metric
+              label="Latency"
+              value={
+                workflowRuns.length
+                  ? Math.round(
+                      workflowRuns.reduce((total, run) => total + run.latencyMs, 0) /
+                        workflowRuns.length,
+                    )
+                  : 0
+              }
+              suffix="ms"
+            />
+          </dl>
+        </Panel>
+      </aside>
+
+      <div className="space-y-8">
+        <section className="rounded-lg border border-black/10 bg-white p-6 shadow-sm sm:p-8">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
+            AI workflow pipeline
+          </p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-normal sm:text-4xl">
+            Chain prompts, conditions, variables, and outputs into repeatable AI operations.
+          </h2>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-black/60">
+            Build production workflows for research, support automation, SEO,
+            content generation, and evaluation-driven deployment gates.
+          </p>
+        </section>
+
+        {selectedWorkflow ? (
+          <Panel title={selectedWorkflow.name} icon={Workflow}>
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-lg font-semibold">{selectedWorkflow.description}</p>
+                <p className="mt-1 text-sm text-black/55">
+                  Variables: {selectedWorkflow.variables.map((item) => `{{${item}}}`).join(", ")}
+                </p>
+              </div>
+              <button
+                className="btn-primary"
+                onClick={() => onRunWorkflow(selectedWorkflow)}
+                disabled={running}
+              >
+                {running ? (
+                  <Loader2 className="animate-spin" size={16} aria-hidden="true" />
+                ) : (
+                  <Sparkles size={16} aria-hidden="true" />
+                )}
+                Run workflow
+              </button>
+            </div>
+
+            <div className="relative min-h-[260px] overflow-auto rounded-lg border border-black/10 bg-[#f8fafc] p-5">
+              <div className="grid min-w-[900px] grid-cols-4 gap-5">
+                {selectedWorkflow.nodes.map((node) => (
+                  <div
+                    key={node.id}
+                    draggable
+                    className="rounded-lg border border-black/10 bg-white p-4 shadow-sm"
+                    title="Drag-and-drop ready workflow node"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-black/45">
+                      {node.kind} node
+                    </p>
+                    <p className="mt-2 text-lg font-semibold">{node.label}</p>
+                    <p className="mt-2 min-h-12 text-sm leading-6 text-black/60">
+                      {node.config}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {selectedWorkflow.edges.map((edge) => (
+                  <span key={edge.id} className="tag">
+                    {edge.from} → {edge.to}: {edge.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              <div className="rounded-lg border border-black/10 bg-white p-5">
+                <p className="text-sm font-semibold">Execution timeline</p>
+                <div className="mt-4 space-y-3">
+                  {(workflowRuns[0]?.logs ?? [
+                    "Run a workflow to generate execution logs.",
+                  ]).map((log) => (
+                    <div key={log} className="flex gap-3 text-sm text-black/65">
+                      <span className="mt-1 size-2 rounded-full bg-[#0f766e]" />
+                      <span>{log}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-lg border border-black/10 bg-white p-5">
+                <p className="text-sm font-semibold">Run history</p>
+                <div className="mt-4 space-y-2">
+                  {workflowRuns.map((run) => (
+                    <div key={run.id} className="rounded-lg bg-black/[0.04] p-3 text-sm">
+                      <div className="flex justify-between gap-3">
+                        <span className="font-semibold">{run.status}</span>
+                        <span>{formatDate(run.createdAt)}</span>
+                      </div>
+                      <p className="mt-1 text-black/55">
+                        {run.latencyMs}ms · {run.tokenEstimate} tokens ·{" "}
+                        {formatCost(run.estimatedCostUsd)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Panel>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function DeploymentCenter({
+  prompts,
+  versions,
+  deployments,
+  history,
+  environment,
+  onEnvironmentChange,
+  onDeploy,
+  onPromote,
+  onRollback,
+}: {
+  prompts: ManagedPrompt[];
+  versions: PromptVersion[];
+  deployments: PromptDeployment[];
+  history: PromptWorkspace["deploymentHistory"];
+  environment: DeploymentEnvironment;
+  onEnvironmentChange: (environment: DeploymentEnvironment) => void;
+  onDeploy: (environment: DeploymentEnvironment) => void;
+  onPromote: (deployment: PromptDeployment) => void;
+  onRollback: (deployment: PromptDeployment) => void;
+}) {
+  const promptById = new Map(prompts.map((prompt) => [prompt.id, prompt]));
+  const versionById = new Map(versions.map((version) => [version.id, version]));
+
+  return (
+    <section className="space-y-8 py-8">
+      <section className="rounded-lg border border-black/10 bg-white p-6 shadow-sm sm:p-8">
+        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
+          Prompt deployment lifecycle
+        </p>
+        <div className="mt-3 grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+          <div>
+            <h2 className="text-3xl font-semibold tracking-normal sm:text-4xl">
+              Promote prompt versions through Development, Staging, and Production.
+            </h2>
+            <p className="mt-4 max-w-3xl text-base leading-8 text-black/60">
+              Track deployment metadata, rollback checkpoints, promotion events,
+              and environment history with a production-style release flow.
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <div className="flex rounded-lg border border-black/10 bg-[#f7f8fb] p-1">
+              {(["development", "staging", "production"] as DeploymentEnvironment[]).map(
+                (item) => (
+                  <button
+                    key={item}
+                    className={clsx(
+                      "flex-1 rounded-md px-3 py-2 text-xs font-semibold capitalize",
+                      environment === item ? "bg-black text-white" : "text-black/55",
+                    )}
+                    onClick={() => onEnvironmentChange(item)}
+                  >
+                    {item}
+                  </button>
+                ),
+              )}
+            </div>
+            <button className="btn-primary justify-center" onClick={() => onDeploy(environment)}>
+              <Rocket size={16} aria-hidden="true" />
+              Deploy selected prompt
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <Panel title={`${environment} deployments`} icon={Rocket}>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {deployments.map((deployment) => {
+              const prompt = promptById.get(deployment.promptId);
+              const version = versionById.get(deployment.versionId);
+
+              return (
+                <article
+                  key={deployment.id}
+                  className="rounded-lg border border-black/10 bg-white p-5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f766e]">
+                        {deployment.status}
+                      </p>
+                      <h3 className="mt-2 text-lg font-semibold">
+                        {prompt?.title ?? "Prompt deployment"}
+                      </h3>
+                    </div>
+                    <span className="rounded-full bg-black px-3 py-1 text-xs font-semibold text-white">
+                      {deployment.environment}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-black/60">
+                    {deployment.metadata}
+                  </p>
+                  <dl className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                    <Info label="Version" value={version ? `v${version.versionNumber}` : "latest"} />
+                    <Info label="Deployed" value={formatDate(deployment.createdAt)} />
+                  </dl>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button className="btn-secondary" onClick={() => onPromote(deployment)}>
+                      <GitBranch size={16} aria-hidden="true" />
+                      Promote
+                    </button>
+                    <button className="btn-secondary" onClick={() => onRollback(deployment)}>
+                      <History size={16} aria-hidden="true" />
+                      Rollback
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+            {!deployments.length ? (
+              <div className="rounded-lg border border-dashed border-black/20 bg-white p-8 text-center">
+                <p className="text-lg font-semibold">No deployments in {environment}</p>
+                <p className="mt-2 text-sm text-black/55">
+                  Deploy the selected prompt to create an environment release.
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </Panel>
+
+        <Panel title="Deployment Timeline" icon={History}>
+          <div className="space-y-3">
+            {history.slice(0, 10).map((event) => (
+              <div key={event.id} className="rounded-lg border border-black/10 bg-white p-4">
+                <p className="text-sm font-semibold">{event.summary}</p>
+                <p className="mt-1 text-xs text-black/45">
+                  {event.action} · {formatDate(event.createdAt)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </div>
+    </section>
+  );
+}
+
 function EvaluationCard({
   evaluation,
   tab,
@@ -3091,6 +3812,16 @@ function AnalyticsDashboard({
     categoryUsage: { name: string; prompts: number; runs: number; color: string }[];
     latencyEvents: { name: string; latency: number }[];
     favoritePrompts: { name: string; runs: number }[];
+    providerUsage: {
+      name: string;
+      cost: number;
+      runs: number;
+      latency: number;
+      provider: string;
+    }[];
+    monthlyUsage: { month: string; tokens: number; cost: number }[];
+    cheapestProvider: string;
+    fastestProvider: string;
     averageLatency: number;
     totalEstimatedCost: number;
   };
@@ -3100,9 +3831,31 @@ function AnalyticsDashboard({
     <section className="grid gap-4 pb-6 xl:grid-cols-[1.2fr_0.8fr]">
       <Panel title="PromptOps Analytics" icon={BarChart3}>
         <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-3 lg:col-span-2 lg:grid-cols-3">
+            <div className="rounded-lg border border-black/10 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/45">
+                Estimated spend
+              </p>
+              <p className="mt-2 text-2xl font-semibold">
+                {formatCost(analytics.totalEstimatedCost)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-black/10 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/45">
+                Cheapest provider
+              </p>
+              <p className="mt-2 text-2xl font-semibold">{analytics.cheapestProvider}</p>
+            </div>
+            <div className="rounded-lg border border-black/10 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/45">
+                Fastest provider
+              </p>
+              <p className="mt-2 text-2xl font-semibold">{analytics.fastestProvider}</p>
+            </div>
+          </div>
           <div className="h-72 rounded-lg border border-black/10 bg-white p-3">
             <p className="mb-2 text-sm font-semibold">Category usage</p>
-            <ResponsiveContainer width="100%" height="88%">
+            <ResponsiveContainer width="100%" height={240}>
               <BarChart data={analytics.categoryUsage}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} />
@@ -3120,7 +3873,7 @@ function AnalyticsDashboard({
             <p className="mb-2 text-sm font-semibold">
               Latency trend - avg {analytics.averageLatency}ms
             </p>
-            <ResponsiveContainer width="100%" height="88%">
+            <ResponsiveContainer width="100%" height={240}>
               <LineChart data={analytics.latencyEvents}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} />
@@ -3131,26 +3884,27 @@ function AnalyticsDashboard({
             </ResponsiveContainer>
           </div>
           <div className="h-72 rounded-lg border border-black/10 bg-white p-3 lg:col-span-2">
-            <p className="mb-2 text-sm font-semibold">Favorite prompt frequency</p>
-            <ResponsiveContainer width="100%" height="88%">
-              <PieChart>
-                <Pie
-                  data={analytics.favoritePrompts}
-                  dataKey="runs"
-                  nameKey="name"
-                  innerRadius={52}
-                  outerRadius={92}
-                  paddingAngle={3}
-                >
-                  {analytics.favoritePrompts.map((item, index) => (
-                    <Cell
-                      key={item.name}
-                      fill={["#0f766e", "#2563eb", "#be123c", "#b45309"][index % 4]}
-                    />
-                  ))}
-                </Pie>
+            <p className="mb-2 text-sm font-semibold">Monthly token usage</p>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={analytics.monthlyUsage}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} />
                 <Tooltip />
-              </PieChart>
+                <Bar dataKey="tokens" fill="#0f766e" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="h-72 rounded-lg border border-black/10 bg-white p-3 lg:col-span-2">
+            <p className="mb-2 text-sm font-semibold">Provider efficiency</p>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={analytics.providerUsage}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} />
+                <Tooltip />
+                <Bar dataKey="latency" fill="#2563eb" radius={[6, 6, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -3184,6 +3938,8 @@ function TeamWorkspacePanel({
   workspaceName,
   collections,
   members,
+  organizations,
+  auditLogs,
   inviteEmail,
   onInviteEmailChange,
   onInvite,
@@ -3191,6 +3947,8 @@ function TeamWorkspacePanel({
   workspaceName: string;
   collections: PromptWorkspace["collections"];
   members: PromptWorkspace["members"];
+  organizations: PromptWorkspace["organizations"];
+  auditLogs: PromptWorkspace["auditLogs"];
   inviteEmail: string;
   onInviteEmailChange: (value: string) => void;
   onInvite: () => void;
@@ -3231,25 +3989,54 @@ function TeamWorkspacePanel({
         </div>
       </Panel>
 
-      <Panel title="Shared Collections" icon={Layers3}>
-        <div className="grid gap-3 md:grid-cols-2">
-          {collections.map((collection) => (
-            <article
-              key={collection.id}
-              className="rounded-lg border border-black/10 bg-white p-4"
-            >
-              <p className="text-sm font-semibold">{collection.name}</p>
-              <p className="mt-2 text-sm leading-6 text-black/60">
-                {collection.description}
-              </p>
-              <div className="mt-3 flex items-center justify-between text-xs text-black/45">
-                <span>{collection.promptIds.length} prompts</span>
-                <span>{collection.visibility}</span>
+      <div className="space-y-4">
+        <Panel title="Organizations" icon={Building2}>
+          <div className="grid gap-3 md:grid-cols-2">
+            {organizations.map((organization) => (
+              <article
+                key={organization.id}
+                className="rounded-lg border border-black/10 bg-white p-4"
+              >
+                <p className="text-sm font-semibold">{organization.name}</p>
+                <p className="mt-1 text-sm text-black/55">{organization.plan}</p>
+              </article>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="Shared Collections" icon={Layers3}>
+          <div className="grid gap-3 md:grid-cols-2">
+            {collections.map((collection) => (
+              <article
+                key={collection.id}
+                className="rounded-lg border border-black/10 bg-white p-4"
+              >
+                <p className="text-sm font-semibold">{collection.name}</p>
+                <p className="mt-2 text-sm leading-6 text-black/60">
+                  {collection.description}
+                </p>
+                <div className="mt-3 flex items-center justify-between text-xs text-black/45">
+                  <span>{collection.promptIds.length} prompts</span>
+                  <span>{collection.visibility}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="Audit Logs" icon={Activity}>
+          <div className="space-y-2">
+            {auditLogs.slice(0, 8).map((log) => (
+              <div key={log.id} className="rounded-lg border border-black/10 bg-white p-3">
+                <p className="text-sm font-semibold">{log.action}</p>
+                <p className="mt-1 text-xs text-black/55">
+                  {log.actor} · {log.target} · {formatDate(log.createdAt)}
+                </p>
               </div>
-            </article>
-          ))}
-        </div>
-      </Panel>
+            ))}
+          </div>
+        </Panel>
+      </div>
     </section>
   );
 }

@@ -25,6 +25,16 @@ test("runs the demo prompt workflow and opens a shared prompt", async ({ page })
   await expect(page.getByText("Experiment results")).toBeVisible();
   await expect(page.getByText("Cost").first()).toBeVisible();
 
+  await page.getByRole("button", { name: "Workflows" }).click();
+  await expect(page.getByText("AI workflow pipeline")).toBeVisible();
+  await page.getByRole("button", { name: "Run workflow" }).click();
+  await expect(page.getByText("Workflow run complete.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Deploy", exact: true }).click();
+  await expect(page.getByText("Prompt deployment lifecycle")).toBeVisible();
+  await page.getByRole("button", { name: "Deploy selected prompt" }).click();
+  await expect(page.getByText("Deployment Timeline")).toBeVisible();
+
   await page.goto("/share/product-brief");
 
   await expect(
