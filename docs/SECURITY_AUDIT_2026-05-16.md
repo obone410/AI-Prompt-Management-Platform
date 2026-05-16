@@ -2,7 +2,7 @@
 
 Target: `https://ai-prompt-management-platform.vercel.app`
 
-Deployment checked: `https://ai-prompt-management-platform-reop4c4ke.vercel.app`
+The production alias was checked after the hardened Vercel deployment completed.
 
 ## Scope
 

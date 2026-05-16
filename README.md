@@ -174,7 +174,6 @@ It confirmed security headers are present, deployed assets do not expose OpenAI/
 
 - GitHub remote: `https://github.com/obone410/AI-Prompt-Management-Platform.git`
 - Production URL: `https://ai-prompt-management-platform.vercel.app`
-- Latest checked deployment: `https://ai-prompt-management-platform-reop4c4ke.vercel.app`
 - Vercel Production and Development environment variables are configured with encrypted values.
 - Vercel Preview environment variables should be added before preview deployments are used.
 

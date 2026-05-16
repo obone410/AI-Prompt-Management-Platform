@@ -25,8 +25,6 @@ Artifacts:
 
 Target: `https://ai-prompt-management-platform.vercel.app`
 
-Deployment: `https://ai-prompt-management-platform-reop4c4ke.vercel.app`
-
 Result:
 
 - Homepage returned `200`.
