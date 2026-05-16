@@ -7,8 +7,8 @@ test("runs the demo prompt workflow and opens a shared prompt", async ({ page })
   await expect(page.getByRole("heading", { name: "PromptDeck AI" })).toBeVisible();
   await expect(page.getByText("Turn Notes Into a Product Brief").first()).toBeVisible();
 
-  await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
-  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("button", { name: "Use demo" })).toBeEnabled();
+  await page.getByRole("button", { name: "Use demo" }).click();
   await expect(page.getByText("Demo session")).toBeVisible();
 
   await page.getByRole("button", { name: "Test prompt" }).click();

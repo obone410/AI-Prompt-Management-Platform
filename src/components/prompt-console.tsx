@@ -66,6 +66,11 @@ type TestResult = {
   latencyMs: number;
 };
 
+const demoCredentials = {
+  email: "demo@promptdeck.ai",
+  password: "promptdeck-demo",
+};
+
 const emptyForm = (categoryId: string): PromptForm => ({
   title: "",
   description: "",
@@ -320,8 +325,8 @@ export function PromptConsole() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [sharedOnly, setSharedOnly] = useState(false);
-  const [authEmail, setAuthEmail] = useState("demo@promptdeck.ai");
-  const [authPassword, setAuthPassword] = useState("promptdeck-demo");
+  const [authEmail, setAuthEmail] = useState(demoCredentials.email);
+  const [authPassword, setAuthPassword] = useState(demoCredentials.password);
   const [authMessage, setAuthMessage] = useState("");
   const [testInput, setTestInput] = useState(
     "A founder wants to organize reusable AI prompts for product, hiring, and engineering work.",
@@ -366,11 +371,13 @@ export function PromptConsole() {
 
     const subscription = supabase?.auth.onAuthStateChange((_event, authSession) => {
       const user = authSession?.user;
-      setSession(
-        user?.email
-          ? { id: user.id, email: user.email, provider: "Supabase" }
-          : null,
-      );
+      setSession((current) => {
+        if (user?.email) {
+          return { id: user.id, email: user.email, provider: "Supabase" };
+        }
+
+        return current?.provider === "Demo" ? current : null;
+      });
     });
 
     return () => {
@@ -483,6 +490,13 @@ export function PromptConsole() {
     return session?.provider === "Supabase" ? session.id : null;
   }
 
+  function isDemoCredentials() {
+    return (
+      authEmail.trim().toLowerCase() === demoCredentials.email &&
+      authPassword === demoCredentials.password
+    );
+  }
+
   async function persistPrompt(prompt: ManagedPrompt) {
     const userId = supabaseUserId();
 
@@ -541,17 +555,29 @@ export function PromptConsole() {
     }
   }
 
+  async function startDemoSession() {
+    setAuthMessage("");
+    await supabase?.auth.signOut({ scope: "local" });
+
+    setSession({
+      id: "demo-user",
+      email: demoCredentials.email,
+      provider: "Demo",
+    });
+    setAuthMessage("Demo workspace unlocked.");
+  }
+
   async function handleAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAuthMessage("");
 
+    if (isDemoCredentials()) {
+      await startDemoSession();
+      return;
+    }
+
     if (!supabase) {
-      setSession({
-        id: "demo-user",
-        email: authEmail || "demo@promptdeck.ai",
-        provider: "Demo",
-      });
-      setAuthMessage("Demo workspace unlocked.");
+      await startDemoSession();
       return;
     }
 
@@ -567,18 +593,34 @@ export function PromptConsole() {
     }
 
     if (error) {
-      const signUp = await supabase.auth.signUp({
-        email: authEmail,
-        password: authPassword,
-      });
-
-      if (signUp.error) {
-        setAuthMessage(signUp.error.message);
-        return;
-      }
-
-      setAuthMessage("Account created. Check your email if confirmations are enabled.");
+      setAuthMessage(error.message);
     }
+  }
+
+  async function createAccount() {
+    setAuthMessage("");
+
+    if (isDemoCredentials()) {
+      await startDemoSession();
+      return;
+    }
+
+    if (!supabase) {
+      await startDemoSession();
+      return;
+    }
+
+    const signUp = await supabase.auth.signUp({
+      email: authEmail,
+      password: authPassword,
+    });
+
+    if (signUp.error) {
+      setAuthMessage(signUp.error.message);
+      return;
+    }
+
+    setAuthMessage("Account created. Check your email if confirmations are enabled.");
   }
 
   async function signOut() {
@@ -834,6 +876,7 @@ export function PromptConsole() {
           input: testInput,
           model: selectedPrompt.model,
           temperature: selectedPrompt.temperature,
+          demoMode: session?.provider === "Demo",
         }),
       });
 
@@ -951,12 +994,36 @@ export function PromptConsole() {
                   />
                   <button
                     className="btn-primary w-full justify-center"
-                    type="submit"
+                    type="button"
                     disabled={!ready}
+                    onClick={() => {
+                      void startDemoSession();
+                    }}
                   >
-                    <LogIn size={16} aria-hidden="true" />
-                    Continue
+                    <Sparkles size={16} aria-hidden="true" />
+                    Use demo
                   </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      className="btn-secondary justify-center"
+                      type="submit"
+                      disabled={!ready}
+                    >
+                      <LogIn size={16} aria-hidden="true" />
+                      Sign in
+                    </button>
+                    <button
+                      className="btn-secondary justify-center"
+                      type="button"
+                      disabled={!ready}
+                      onClick={() => {
+                        void createAccount();
+                      }}
+                    >
+                      <Plus size={16} aria-hidden="true" />
+                      Create
+                    </button>
+                  </div>
                   {authMessage ? (
                     <p className="text-xs font-medium text-[#0f766e]">{authMessage}</p>
                   ) : null}

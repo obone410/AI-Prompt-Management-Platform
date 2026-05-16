@@ -12,6 +12,7 @@ const PromptTestSchema = z.object({
   input: z.string().max(4000).optional().default(""),
   model: z.string().min(2).max(80).optional(),
   temperature: z.number().min(0).max(1.5).optional(),
+  demoMode: z.boolean().optional().default(false),
 });
 
 const buckets = new Map<string, { count: number; resetAt: number }>();
@@ -99,8 +100,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { prompt, input, temperature } = parsed.data;
+  const { prompt, input, temperature, demoMode } = parsed.data;
   const model = parsed.data.model ?? serverConfig.openAiModel;
+
+  if (demoMode) {
+    return NextResponse.json({
+      output: demoResponse(prompt, input),
+      model,
+      provider: "demo",
+      latencyMs: Math.round(performance.now() - startedAt),
+    });
+  }
 
   if (
     serverConfig.isOpenAiConfigured &&

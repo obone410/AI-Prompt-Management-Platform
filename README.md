@@ -21,6 +21,7 @@ PromptDeck AI is built as a real working console, not a landing page. It runs lo
 ## Features
 
 - Authentication-ready account flow with Supabase support and local demo mode
+- Explicit demo access that never creates a Supabase account by accident
 - Prompt CRUD for creating, editing, duplicating, deleting, and organizing prompts
 - Supabase-backed prompt/category/run persistence when configured
 - Prompt categories with color-coded library filters
@@ -97,7 +98,7 @@ The test bench calls:
 POST /api/test-prompt
 ```
 
-The route validates input with Zod, rate-limits local requests, keeps `OPENAI_API_KEY` server-only, and uses the OpenAI Responses API when credentials exist. When Supabase and OpenAI are configured together, live tests require a Supabase session so anonymous traffic cannot spend provider quota. The route also omits temperature automatically for models that do not support that parameter.
+The route validates input with Zod, rate-limits local requests, keeps `OPENAI_API_KEY` server-only, and uses the OpenAI Responses API when credentials exist. When Supabase and OpenAI are configured together, live provider tests require a Supabase session so anonymous traffic cannot spend provider quota. Explicit demo sessions return a deterministic demo response without calling OpenAI. The route also omits temperature automatically for models that do not support that parameter.
 
 If no OpenAI key is configured, the route returns a deterministic demo response so the project can still be reviewed locally.
 

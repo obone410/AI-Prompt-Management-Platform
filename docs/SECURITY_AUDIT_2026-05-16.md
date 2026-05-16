@@ -31,13 +31,13 @@ No high or critical exploitable vulnerability survived validation after these fi
 
 Deployed HTML and 8 generated Next.js JavaScript assets were scanned for secret-shaped values:
 
-- No OpenAI `sk-` or `sk-proj-` keys found.
+- No OpenAI secret key values found.
 - No Vercel token found.
 - No Supabase service-role key or `service_role` marker found.
 - No `OPENAI_API_KEY` text found in deployed assets.
 - Supabase URL and publishable key were present in one client chunk; this is expected because `NEXT_PUBLIC_*` Supabase browser config is intentionally public and protected by RLS.
 
-Tracked source scan also found no committed OpenAI project secret, Supabase service JWT, `sb_secret_*`, or Vercel token values.
+Tracked source scan also found no committed OpenAI project secret, Supabase service JWT, Supabase secret key, or Vercel token values.
 
 ## Live Production Verification
 

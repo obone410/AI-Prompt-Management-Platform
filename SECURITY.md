@@ -11,6 +11,7 @@ PromptDeck AI is designed so public keys can be committed only through `.env.exa
 - AI test requests validate payload size with Zod before calling the provider.
 - The AI test route has a per-IP in-memory limiter for local/dev safety.
 - Live OpenAI tests require a Supabase session when Supabase and OpenAI are both configured.
+- Explicit demo-mode tests return a deterministic response without calling OpenAI.
 - Production responses set CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, and COOP headers.
 - Supabase migration enables Row Level Security on all user data tables.
 - RLS policies restrict private prompts, categories, profiles, and prompt runs to the owning user.

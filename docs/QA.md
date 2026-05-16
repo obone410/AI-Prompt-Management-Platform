@@ -10,6 +10,8 @@ Coverage:
 - Supabase public project configuration loads in the production build.
 - Demo auth flow signs into the local workspace.
 - Prompt test bench returns the deterministic demo AI response when no OpenAI key is configured.
+- Demo access returns a local demo session and deterministic demo AI response even when Supabase/OpenAI env vars are configured.
+- Demo access was checked for accidental Supabase signup calls; observed signup requests: `0`.
 - Shared prompt page renders the public prompt preview.
 - Screenshots were refreshed from a production build.
 - Playwright e2e forces demo mode on its own port so tests do not depend on paid AI quota.
