@@ -23,6 +23,7 @@ Coverage:
 Artifacts:
 
 - `docs/screenshots/dashboard-desktop.png`
+- `docs/screenshots/experiments-desktop.png`
 - `docs/screenshots/dashboard-mobile.png`
 - `docs/screenshots/shared-prompt.png`
 - `docs/screenshots/live-production-security.png`

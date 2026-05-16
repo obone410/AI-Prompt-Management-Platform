@@ -57,10 +57,54 @@ export type PromptEvaluation = {
   input: string;
   output: string;
   latencyMs: number;
+  inputTokenEstimate: number;
+  outputTokenEstimate: number;
   tokenEstimate: number;
+  estimatedCostUsd: number;
   outputLength: number;
   qualityScore: number;
   createdAt: string;
+};
+
+export type PromptExperimentVariant = {
+  id: string;
+  label: string;
+  promptId: string | null;
+  content: string;
+  model: string;
+  temperature: number;
+  notes: string;
+};
+
+export type PromptExperimentResult = {
+  id: string;
+  variantId: string;
+  variantLabel: string;
+  model: string;
+  provider: "openai" | "anthropic" | "google" | "demo";
+  output: string;
+  latencyMs: number;
+  inputTokenEstimate: number;
+  outputTokenEstimate: number;
+  tokenEstimate: number;
+  estimatedCostUsd: number;
+  outputLength: number;
+  qualityScore: number;
+  hallucinationRisk: number;
+  createdAt: string;
+};
+
+export type PromptExperiment = {
+  id: string;
+  workspaceId: string;
+  promptId: string | null;
+  title: string;
+  hypothesis: string;
+  status: "draft" | "running" | "completed";
+  variants: PromptExperimentVariant[];
+  results: PromptExperimentResult[];
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type PromptActivity = {
@@ -103,6 +147,7 @@ export type PromptWorkspace = {
   runs: PromptRun[];
   versions: PromptVersion[];
   evaluations: PromptEvaluation[];
+  experiments: PromptExperiment[];
   activities: PromptActivity[];
   workspaces: PromptOpsWorkspace[];
   collections: SharedCollection[];
@@ -280,10 +325,84 @@ export const seedWorkspace: PromptWorkspace = {
       input: "Founder notes about organizing reusable prompts.",
       output: "Demo evaluation output for the product brief workflow.",
       latencyMs: 420,
+      inputTokenEstimate: 128,
+      outputTokenEstimate: 50,
       tokenEstimate: 178,
+      estimatedCostUsd: 0.00066,
       outputLength: 58,
       qualityScore: 86,
       createdAt: "2026-05-15T09:30:00.000Z",
+    },
+  ],
+  experiments: [
+    {
+      id: "experiment-prd-optimization",
+      workspaceId: "workspace-promptops",
+      promptId: "prompt-prd",
+      title: "PRD Generator Optimization",
+      hypothesis:
+        "A structured PM prompt with evidence boundaries will improve output completeness without materially increasing latency.",
+      status: "completed",
+      variants: [
+        {
+          id: "variant-prd-a",
+          label: "Version A",
+          promptId: "prompt-prd",
+          content:
+            "Convert raw notes into a concise product brief with problem, persona, metrics, scope, risks, and open questions.\n\nRaw notes:\n{{input}}",
+          model: "gpt-5",
+          temperature: 0.3,
+          notes: "Short baseline prompt.",
+        },
+        {
+          id: "variant-prd-b",
+          label: "Version B",
+          promptId: "prompt-prd",
+          content:
+            "You are a senior product manager. Convert raw discovery notes into a decision-ready PRD. Separate facts, assumptions, risks, and open questions. Include success metrics, launch scope, non-goals, and recommended next experiments.\n\nRaw notes:\n{{input}}",
+          model: "gpt-5",
+          temperature: 0.25,
+          notes: "Structured PromptOps variant with risk boundaries.",
+        },
+      ],
+      results: [
+        {
+          id: "result-prd-a-gpt",
+          variantId: "variant-prd-a",
+          variantLabel: "Version A",
+          model: "gpt-5",
+          provider: "demo",
+          output: "Concise PRD draft with problem, persona, metrics, scope, risks, and questions.",
+          latencyMs: 410,
+          inputTokenEstimate: 122,
+          outputTokenEstimate: 64,
+          tokenEstimate: 186,
+          estimatedCostUsd: 0.000793,
+          outputLength: 79,
+          qualityScore: 82,
+          hallucinationRisk: 28,
+          createdAt: "2026-05-15T09:40:00.000Z",
+        },
+        {
+          id: "result-prd-b-gpt",
+          variantId: "variant-prd-b",
+          variantLabel: "Version B",
+          model: "gpt-5",
+          provider: "demo",
+          output: "Decision-ready PRD with evidence boundaries, assumptions, non-goals, risks, metrics, and next experiments.",
+          latencyMs: 445,
+          inputTokenEstimate: 156,
+          outputTokenEstimate: 92,
+          tokenEstimate: 248,
+          estimatedCostUsd: 0.001115,
+          outputLength: 104,
+          qualityScore: 91,
+          hallucinationRisk: 14,
+          createdAt: "2026-05-15T09:41:00.000Z",
+        },
+      ],
+      createdAt: "2026-05-15T09:35:00.000Z",
+      updatedAt: "2026-05-15T09:41:00.000Z",
     },
   ],
   activities: [
@@ -304,13 +423,31 @@ export const seedWorkspace: PromptWorkspace = {
   ],
 };
 
+function normalizeEvaluations(evaluations: PromptEvaluation[] | undefined) {
+  return (evaluations ?? []).map((evaluation) => {
+    const inputTokenEstimate =
+      evaluation.inputTokenEstimate ?? Math.max(1, Math.ceil(evaluation.input.length / 4));
+    const outputTokenEstimate =
+      evaluation.outputTokenEstimate ?? Math.max(1, Math.ceil(evaluation.output.length / 4));
+
+    return {
+      ...evaluation,
+      inputTokenEstimate,
+      outputTokenEstimate,
+      tokenEstimate: evaluation.tokenEstimate ?? inputTokenEstimate + outputTokenEstimate,
+      estimatedCostUsd: evaluation.estimatedCostUsd ?? 0,
+    };
+  });
+}
+
 export function normalizeWorkspace(workspace: Partial<PromptWorkspace>): PromptWorkspace {
   return {
     categories: workspace.categories ?? seedWorkspace.categories,
     prompts: workspace.prompts ?? seedWorkspace.prompts,
     runs: workspace.runs ?? [],
     versions: workspace.versions ?? [],
-    evaluations: workspace.evaluations ?? [],
+    evaluations: normalizeEvaluations(workspace.evaluations),
+    experiments: workspace.experiments ?? seedWorkspace.experiments,
     activities: workspace.activities ?? [],
     workspaces: workspace.workspaces ?? seedWorkspace.workspaces,
     collections: workspace.collections ?? seedWorkspace.collections,

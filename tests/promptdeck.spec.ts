@@ -5,17 +5,25 @@ test("runs the demo prompt workflow and opens a shared prompt", async ({ page })
   await page.waitForLoadState("networkidle");
 
   await expect(page.getByRole("heading", { name: "PromptDeck AI" })).toBeVisible();
-  await expect(page.getByText("Turn Notes Into a Product Brief").first()).toBeVisible();
+  await expect(page.getByText("LLM experimentation suite")).toBeVisible();
 
   await expect(page.getByRole("button", { name: "Use demo" })).toBeEnabled();
   await page.getByRole("button", { name: "Use demo" }).click();
   await expect(page.getByText("Demo session")).toBeVisible();
 
+  await page.getByRole("button", { name: "Operate" }).click();
+  await expect(page.getByText("Turn Notes Into a Product Brief").first()).toBeVisible();
   await page.getByRole("button", { name: "Test prompt" }).click();
 
   await page.waitForFunction(() =>
     document.body.textContent?.includes("Demo response:"),
   );
+
+  await page.getByRole("button", { name: "Experiments" }).click();
+  await expect(page.getByText("LLM experimentation suite")).toBeVisible();
+  await page.getByRole("button", { name: "Run experiment" }).first().click();
+  await expect(page.getByText("Experiment results")).toBeVisible();
+  await expect(page.getByText("Cost").first()).toBeVisible();
 
   await page.goto("/share/product-brief");
 

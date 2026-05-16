@@ -4,6 +4,7 @@ import {
   Activity,
   BarChart3,
   Brain,
+  CircleDollarSign,
   Bot,
   Check,
   Clipboard,
@@ -28,10 +29,12 @@ import {
   Share2,
   ShieldCheck,
   Sparkles,
+  ServerCog,
   Trash2,
   Users,
   Variable,
   WandSparkles,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
@@ -73,6 +76,9 @@ import {
   normalizeWorkspace,
   type PromptActivity,
   type PromptEvaluation,
+  type PromptExperiment,
+  type PromptExperimentResult,
+  type PromptExperimentVariant,
   type PromptRun,
   type PromptVersion,
   type PromptWorkspace,
@@ -105,7 +111,7 @@ type TestResult = {
   latencyMs: number;
 };
 
-type ActiveView = "operate" | "lab" | "analytics" | "team";
+type ActiveView = "operate" | "experiments" | "analytics" | "team";
 
 type EvaluationTab = "output" | "metrics" | "notes";
 
@@ -184,7 +190,10 @@ type EvaluationRow = {
   input: string;
   output: string;
   latency_ms: number;
+  input_token_estimate?: number | null;
+  output_token_estimate?: number | null;
   token_estimate: number;
+  estimated_cost_usd?: number | null;
   output_length: number;
   quality_score: number;
   created_at: string;
@@ -262,7 +271,12 @@ function mapEvaluation(row: EvaluationRow): PromptEvaluation {
     input: row.input,
     output: row.output,
     latencyMs: row.latency_ms,
+    inputTokenEstimate:
+      row.input_token_estimate ?? Math.max(1, Math.ceil(row.input.length / 4)),
+    outputTokenEstimate:
+      row.output_token_estimate ?? Math.max(1, Math.ceil(row.output.length / 4)),
     tokenEstimate: row.token_estimate,
+    estimatedCostUsd: row.estimated_cost_usd ?? 0,
     outputLength: row.output_length,
     qualityScore: row.quality_score,
     createdAt: row.created_at,
@@ -436,6 +450,23 @@ function fileSafeDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function formatCost(value: number) {
+  if (value <= 0) {
+    return "$0.000000";
+  }
+
+  return `$${value.toFixed(6)}`;
+}
+
+function isUuid(value: string | null | undefined) {
+  return Boolean(
+    value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        value,
+      ),
+  );
+}
+
 function downloadFile(filename: string, content: string, type: string) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -460,7 +491,7 @@ export function PromptConsole() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [sharedOnly, setSharedOnly] = useState(false);
-  const [activeView, setActiveView] = useState<ActiveView>("operate");
+  const [activeView, setActiveView] = useState<ActiveView>("experiments");
   const [commandOpen, setCommandOpen] = useState(false);
   const [visiblePromptCount, setVisiblePromptCount] = useState(8);
   const [authEmail, setAuthEmail] = useState(demoCredentials.email);
@@ -477,6 +508,10 @@ export function PromptConsole() {
   const [evaluationResults, setEvaluationResults] = useState<EvaluationResult[]>([]);
   const [evaluationTab, setEvaluationTab] = useState<EvaluationTab>("output");
   const [evaluating, setEvaluating] = useState(false);
+  const [selectedExperimentId, setSelectedExperimentId] = useState(
+    "experiment-prd-optimization",
+  );
+  const [experimentRunning, setExperimentRunning] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
   const [optimization, setOptimization] = useState<PromptOptimizationResult | null>(null);
   const [inviteEmail, setInviteEmail] = useState("teammate@company.com");
@@ -568,6 +603,10 @@ export function PromptConsole() {
 
       if (event.key.toLowerCase() === "a") {
         setActiveView("analytics");
+      }
+
+      if (event.key.toLowerCase() === "e") {
+        setActiveView("experiments");
       }
     }
 
@@ -691,6 +730,9 @@ export function PromptConsole() {
     .sort((a, b) => b.versionNumber - a.versionNumber);
   const latestVersion = selectedVersions[0];
   const activeWorkspace = workspace.workspaces[0];
+  const selectedExperiment =
+    workspace.experiments.find((experiment) => experiment.id === selectedExperimentId) ??
+    workspace.experiments[0];
   const analytics = useMemo(() => {
     const categoryUsage = workspace.categories.map((category) => ({
       name: category.name,
@@ -716,6 +758,10 @@ export function PromptConsole() {
       categoryUsage,
       latencyEvents,
       favoritePrompts,
+      totalEstimatedCost: workspace.evaluations.reduce(
+        (total, evaluation) => total + evaluation.estimatedCostUsd,
+        0,
+      ),
       averageLatency:
         latencyEvents.length > 0
           ? Math.round(
@@ -731,6 +777,7 @@ export function PromptConsole() {
     favorites: workspace.prompts.filter((prompt) => prompt.isFavorite).length,
     shared: workspace.prompts.filter((prompt) => prompt.isPublic).length,
     tests: workspace.runs.length + workspace.evaluations.length,
+    experiments: workspace.experiments.length,
   };
 
   function showToast(message: string) {
@@ -862,7 +909,10 @@ export function PromptConsole() {
       model: evaluation.model,
       provider: evaluation.provider,
       latency_ms: evaluation.latencyMs,
+      input_token_estimate: evaluation.inputTokenEstimate,
+      output_token_estimate: evaluation.outputTokenEstimate,
       token_estimate: evaluation.tokenEstimate,
+      estimated_cost_usd: evaluation.estimatedCostUsd,
       output_length: evaluation.outputLength,
       quality_score: evaluation.qualityScore,
       created_at: evaluation.createdAt,
@@ -870,6 +920,82 @@ export function PromptConsole() {
 
     if (error && !/prompt_evaluations/i.test(error.message)) {
       showToast(`Evaluation sync failed: ${error.message}`);
+    }
+  }
+
+  async function persistExperiment(experiment: PromptExperiment) {
+    const userId = supabaseUserId();
+
+    if (!supabase || !userId) {
+      return;
+    }
+
+    const workspaceId = isUuid(experiment.workspaceId) ? experiment.workspaceId : null;
+    const promptId = isUuid(experiment.promptId) ? experiment.promptId : null;
+    const experimentResult = await supabase.from("prompt_experiments").upsert({
+      id: experiment.id,
+      user_id: userId,
+      workspace_id: workspaceId,
+      prompt_id: promptId,
+      title: experiment.title,
+      hypothesis: experiment.hypothesis,
+      status: experiment.status,
+      updated_at: experiment.updatedAt,
+      created_at: experiment.createdAt,
+    });
+
+    if (experimentResult.error) {
+      if (!/prompt_experiments/i.test(experimentResult.error.message)) {
+        showToast(`Experiment sync failed: ${experimentResult.error.message}`);
+      }
+      return;
+    }
+
+    const variantResult = await supabase.from("prompt_experiment_variants").upsert(
+      experiment.variants.map((variant) => ({
+        id: variant.id,
+        experiment_id: experiment.id,
+        prompt_id: isUuid(variant.promptId) ? variant.promptId : null,
+        label: variant.label,
+        content: variant.content,
+        model: variant.model,
+        temperature: variant.temperature,
+        notes: variant.notes,
+      })),
+    );
+
+    if (variantResult.error) {
+      showToast(`Variant sync failed: ${variantResult.error.message}`);
+      return;
+    }
+
+    if (!experiment.results.length) {
+      return;
+    }
+
+    const resultSync = await supabase.from("prompt_experiment_results").upsert(
+      experiment.results.map((result) => ({
+        id: result.id,
+        experiment_id: experiment.id,
+        variant_id: result.variantId,
+        user_id: userId,
+        provider: result.provider,
+        model: result.model,
+        output: result.output,
+        latency_ms: result.latencyMs,
+        input_token_estimate: result.inputTokenEstimate,
+        output_token_estimate: result.outputTokenEstimate,
+        token_estimate: result.tokenEstimate,
+        estimated_cost_usd: result.estimatedCostUsd,
+        output_length: result.outputLength,
+        quality_score: result.qualityScore,
+        hallucination_risk: result.hallucinationRisk,
+        created_at: result.createdAt,
+      })),
+    );
+
+    if (resultSync.error) {
+      showToast(`Experiment result sync failed: ${resultSync.error.message}`);
     }
   }
 
@@ -1390,6 +1516,153 @@ export function PromptConsole() {
     }
   }
 
+  function createExperimentFromPrompt() {
+    if (!selectedPrompt) {
+      showToast("Select a prompt before creating an experiment.");
+      return;
+    }
+
+    const timestamp = new Date().toISOString();
+    const structuredVariant = [
+      selectedPrompt.content,
+      "",
+      "Experiment guardrails:",
+      "1. Separate facts, assumptions, and recommendations.",
+      "2. Score confidence for each recommendation.",
+      "3. Flag missing context instead of inventing details.",
+      "4. End with measurable next actions.",
+    ].join("\n");
+    const experiment: PromptExperiment = {
+      id: promptIdForCurrentMode("experiment"),
+      workspaceId: activeWorkspace?.id ?? "workspace-promptops",
+      promptId: selectedPrompt.id,
+      title: `${selectedPrompt.title} Experiment`,
+      hypothesis:
+        "A structured PromptOps variant will increase quality and risk control while keeping latency and cost inside acceptable bounds.",
+      status: "draft",
+      variants: [
+        {
+          id: promptIdForCurrentMode("variant"),
+          label: "Version A",
+          promptId: selectedPrompt.id,
+          content: selectedPrompt.content,
+          model: selectedPrompt.model,
+          temperature: selectedPrompt.temperature,
+          notes: "Current production prompt.",
+        },
+        {
+          id: promptIdForCurrentMode("variant"),
+          label: "Version B",
+          promptId: selectedPrompt.id,
+          content: structuredVariant,
+          model: selectedPrompt.model,
+          temperature: Math.max(0, selectedPrompt.temperature - 0.05),
+          notes: "Structured PromptOps variant with evidence boundaries.",
+        },
+      ],
+      results: [],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    setWorkspace((current) => ({
+      ...current,
+      experiments: [experiment, ...current.experiments],
+    }));
+    setSelectedExperimentId(experiment.id);
+    setActiveView("experiments");
+    recordActivity(
+      "experiment.created",
+      `Created experiment for ${selectedPrompt.title}.`,
+      selectedPrompt.id,
+    );
+    void persistExperiment(experiment);
+    showToast("Prompt experiment created.");
+  }
+
+  async function runPromptExperiment(experiment: PromptExperiment) {
+    if (!experiment.variants.length) {
+      showToast("Add variants before running an experiment.");
+      return;
+    }
+
+    if (missingVariables.length) {
+      showToast(`Add values for: ${missingVariables.join(", ")}`);
+      return;
+    }
+
+    setExperimentRunning(true);
+    const timestamp = new Date().toISOString();
+
+    try {
+      const batches = await Promise.all(
+        experiment.variants.map(async (variant) => {
+          const response = await fetch("/api/evaluate-prompt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: renderPromptTemplate(variant.content, variablePayload),
+              input: testInput,
+              models: evaluationModels,
+              demoMode: session?.provider === "Demo",
+            }),
+          });
+          const payload = (await response.json()) as {
+            evaluations?: EvaluationResult[];
+            error?: string;
+          };
+
+          if (!response.ok || !payload.evaluations) {
+            throw new Error(payload.error ?? "Experiment evaluation failed.");
+          }
+
+          return payload.evaluations.map((evaluation) => ({
+            id: promptIdForCurrentMode("experiment-result"),
+            variantId: variant.id,
+            variantLabel: variant.label,
+            model: evaluation.model,
+            provider: evaluation.provider,
+            output: evaluation.output,
+            latencyMs: evaluation.latencyMs,
+            inputTokenEstimate: evaluation.inputTokenEstimate,
+            outputTokenEstimate: evaluation.outputTokenEstimate,
+            tokenEstimate: evaluation.tokenEstimate,
+            estimatedCostUsd: evaluation.estimatedCostUsd,
+            outputLength: evaluation.outputLength,
+            qualityScore: evaluation.qualityScore,
+            hallucinationRisk: Math.max(2, 100 - evaluation.qualityMetrics.riskControl),
+            createdAt: timestamp,
+          })) satisfies PromptExperimentResult[];
+        }),
+      );
+      const results = batches.flat();
+      const updatedExperiment = {
+        ...experiment,
+        status: "completed",
+        results,
+        updatedAt: timestamp,
+      } satisfies PromptExperiment;
+
+      setWorkspace((current) => ({
+        ...current,
+        experiments: current.experiments.map((item) =>
+          item.id === experiment.id ? updatedExperiment : item,
+        ),
+      }));
+      recordActivity(
+        "experiment.completed",
+        `Ran ${experiment.title} across ${results.length} variant/model comparisons.`,
+        experiment.promptId,
+      );
+      void persistExperiment(updatedExperiment);
+      showToast("Experiment results ready.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Experiment failed.");
+    } finally {
+      setExperimentRunning(false);
+    }
+  }
+
   async function improvePrompt() {
     const sourcePrompt = form.content || selectedPrompt?.content;
 
@@ -1480,30 +1753,52 @@ export function PromptConsole() {
 
   const viewTabs: { view: ActiveView; icon: LucideIcon; label: string }[] = [
     { view: "operate", icon: LayoutDashboard, label: "Operate" },
-    { view: "lab", icon: Brain, label: "AI Lab" },
+    { view: "experiments", icon: Workflow, label: "Experiments" },
     { view: "analytics", icon: BarChart3, label: "Analytics" },
     { view: "team", icon: Users, label: "Team" },
   ];
 
   return (
-    <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1520px] flex-col px-4 py-4 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-4 border-b border-black/10 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-11 shrink-0 place-items-center rounded-lg bg-black text-white">
-              <Sparkles size={22} aria-hidden="true" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0f766e]">
-                PromptOps Platform
-              </p>
-              <h1 className="truncate text-2xl font-semibold tracking-normal sm:text-3xl">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#eefdf8_0,#f7f8fb_28%,#f7f8fb_100%)] text-[var(--foreground)]">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col px-4 py-6 sm:px-6 lg:px-10">
+        <header className="border-b border-black/10 pb-8 pt-3">
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-4xl">
+              <div className="mb-5 flex items-center gap-3">
+                <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-black text-white shadow-lg shadow-black/10">
+                  <Sparkles size={22} aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0f766e]">
+                    PromptOps Platform
+                  </p>
+                  <p className="text-sm font-semibold text-black/55">
+                    LLM operations, experiments, and workflow infrastructure
+                  </p>
+                </div>
+              </div>
+              <h1 className="text-4xl font-semibold tracking-normal text-black sm:text-5xl lg:text-6xl">
                 PromptDeck AI
               </h1>
+              <p className="mt-5 max-w-3xl text-lg leading-8 text-black/60 sm:text-xl">
+                A premium AI workspace for prompt versions, model evaluations,
+                experiments, cost visibility, and team-ready PromptOps workflows.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-2">
+                <StatusBadge icon={ServerCog} label="Redis rate limits" />
+                <StatusBadge icon={Activity} label="PostHog/Sentry hooks" />
+                <StatusBadge icon={ShieldCheck} label="RLS protected" />
+                <StatusBadge icon={CircleDollarSign} label="Cost estimates" />
+              </div>
+            </div>
+
+            <div className="grid min-w-[260px] gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              <Metric label="Prompts" value={stats.prompts} />
+              <Metric label="Experiments" value={stats.experiments} />
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="mt-7 flex flex-wrap items-center gap-2">
             <button className="btn-secondary" onClick={() => setCommandOpen(true)}>
               <Command size={16} aria-hidden="true" />
               Cmd+K
@@ -1516,6 +1811,20 @@ export function PromptConsole() {
                   : "Local demo mode"
               }
             />
+            {!session ? (
+              <button
+                className="btn-secondary"
+                disabled={!ready}
+                onClick={() => {
+                  void startDemoSession();
+                }}
+              >
+                <Sparkles size={16} aria-hidden="true" />
+                Use demo
+              </button>
+            ) : (
+              <StatusBadge icon={Sparkles} label={`${session.provider} session`} />
+            )}
             <button className="btn-secondary" onClick={() => exportPrompts("json")}>
               <Download size={16} aria-hidden="true" />
               JSON
@@ -1531,13 +1840,13 @@ export function PromptConsole() {
           </div>
         </header>
 
-        <nav className="flex flex-wrap items-center gap-2 border-b border-black/10 py-3">
+        <nav className="flex flex-wrap items-center gap-2 border-b border-black/10 py-4">
           {viewTabs.map(({ view, icon: TabIcon, label }) => {
             return (
               <button
                 key={view}
                 className={clsx(
-                  "inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-semibold",
+                  "inline-flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-semibold transition",
                   activeView === view
                     ? "border-black bg-black text-white"
                     : "border-black/10 bg-white/70 text-black/65 hover:bg-white",
@@ -1550,11 +1859,12 @@ export function PromptConsole() {
             );
           })}
           <span className="ml-auto hidden text-xs font-medium uppercase tracking-[0.16em] text-black/40 lg:inline">
-            N new prompt / A analytics / Cmd+K command
+            N new / E experiments / A analytics / Cmd+K command
           </span>
         </nav>
 
-        <section className="grid flex-1 gap-4 py-4 xl:grid-cols-[280px_minmax(0,1fr)_380px]">
+        {activeView === "operate" ? (
+        <section className="grid flex-1 gap-6 py-7 xl:grid-cols-[300px_minmax(0,1fr)_420px]">
           <aside className="flex min-w-0 flex-col gap-4">
             <Panel title="Account" icon={Lock}>
               {session ? (
@@ -2236,6 +2546,34 @@ export function PromptConsole() {
             </div>
           </aside>
         </section>
+        ) : null}
+
+        {activeView === "experiments" ? (
+          <ExperimentLab
+            experiments={workspace.experiments}
+            selectedExperiment={selectedExperiment}
+            selectedPrompt={selectedPrompt}
+            evaluationModels={evaluationModels}
+            evaluationResults={evaluationResults}
+            evaluationTab={evaluationTab}
+            evaluating={evaluating}
+            experimentRunning={experimentRunning}
+            testInput={testInput}
+            onTestInputChange={setTestInput}
+            onSelectExperiment={setSelectedExperimentId}
+            onCreateExperiment={createExperimentFromPrompt}
+            onRunExperiment={(experiment) => void runPromptExperiment(experiment)}
+            onRunEvaluation={() => void runSideBySideEvaluation()}
+            onEvaluationTabChange={setEvaluationTab}
+            onToggleModel={(modelId, checked) =>
+              setEvaluationModels((current) =>
+                checked
+                  ? [...new Set([...current, modelId])].slice(0, 4)
+                  : current.filter((item) => item !== modelId),
+              )
+            }
+          />
+        ) : null}
 
         {activeView === "analytics" ? (
           <AnalyticsDashboard analytics={analytics} activities={workspace.activities} />
@@ -2264,6 +2602,16 @@ export function PromptConsole() {
             icon: BarChart3,
             run: () => void runSideBySideEvaluation(),
           },
+          {
+            label: "Create prompt experiment",
+            icon: Workflow,
+            run: createExperimentFromPrompt,
+          },
+          {
+            label: "Open experiments",
+            icon: Workflow,
+            run: () => setActiveView("experiments"),
+          },
           { label: "Open analytics", icon: Activity, run: () => setActiveView("analytics") },
           { label: "Open team workspace", icon: Users, run: () => setActiveView("team") },
         ]}
@@ -2279,6 +2627,373 @@ export function PromptConsole() {
   );
 }
 
+function ExperimentLab({
+  experiments,
+  selectedExperiment,
+  selectedPrompt,
+  evaluationModels,
+  evaluationResults,
+  evaluationTab,
+  evaluating,
+  experimentRunning,
+  testInput,
+  onTestInputChange,
+  onSelectExperiment,
+  onCreateExperiment,
+  onRunExperiment,
+  onRunEvaluation,
+  onEvaluationTabChange,
+  onToggleModel,
+}: {
+  experiments: PromptExperiment[];
+  selectedExperiment?: PromptExperiment;
+  selectedPrompt?: ManagedPrompt;
+  evaluationModels: string[];
+  evaluationResults: EvaluationResult[];
+  evaluationTab: EvaluationTab;
+  evaluating: boolean;
+  experimentRunning: boolean;
+  testInput: string;
+  onTestInputChange: (value: string) => void;
+  onSelectExperiment: (id: string) => void;
+  onCreateExperiment: () => void;
+  onRunExperiment: (experiment: PromptExperiment) => void;
+  onRunEvaluation: () => void;
+  onEvaluationTabChange: (tab: EvaluationTab) => void;
+  onToggleModel: (modelId: string, checked: boolean) => void;
+}) {
+  const results = selectedExperiment?.results ?? [];
+  const bestResult = results.reduce<PromptExperimentResult | null>(
+    (winner, result) =>
+      !winner || result.qualityScore > winner.qualityScore ? result : winner,
+    null,
+  );
+  const averageLatency = results.length
+    ? Math.round(results.reduce((total, item) => total + item.latencyMs, 0) / results.length)
+    : 0;
+  const totalCost = results.reduce((total, item) => total + item.estimatedCostUsd, 0);
+
+  return (
+    <section className="grid gap-8 py-8 xl:grid-cols-[340px_minmax(0,1fr)]">
+      <aside className="space-y-6">
+        <Panel title="Experiment Registry" icon={Workflow}>
+          <div className="space-y-3">
+            {experiments.map((experiment) => (
+              <button
+                key={experiment.id}
+                className={clsx(
+                  "block w-full rounded-lg border p-4 text-left transition",
+                  selectedExperiment?.id === experiment.id
+                    ? "border-black bg-white shadow-sm"
+                    : "border-black/10 bg-white/70 hover:bg-white",
+                )}
+                onClick={() => onSelectExperiment(experiment.id)}
+              >
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f766e]">
+                  {experiment.status}
+                </span>
+                <p className="mt-2 text-base font-semibold">{experiment.title}</p>
+                <p className="mt-2 line-clamp-3 text-sm leading-6 text-black/60">
+                  {experiment.hypothesis}
+                </p>
+              </button>
+            ))}
+            <button className="btn-primary w-full justify-center" onClick={onCreateExperiment}>
+              <Plus size={16} aria-hidden="true" />
+              New experiment from prompt
+            </button>
+          </div>
+        </Panel>
+
+        <Panel title="Infrastructure Signals" icon={ServerCog}>
+          <div className="space-y-3">
+            {[
+              ["Redis", "rate limit and burst control"],
+              ["Queue", "inline job abstraction ready for workers"],
+              ["Sentry", "server error capture hook"],
+              ["PostHog", "product analytics event hook"],
+              ["Edge", "Vercel static and dynamic route split"],
+            ].map(([name, detail]) => (
+              <div
+                key={name}
+                className="rounded-lg border border-black/10 bg-white p-4"
+              >
+                <p className="text-sm font-semibold">{name}</p>
+                <p className="mt-1 text-sm leading-6 text-black/60">{detail}</p>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </aside>
+
+      <div className="min-w-0 space-y-8">
+        <section className="rounded-lg border border-black/10 bg-white p-6 shadow-sm sm:p-8">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
+                LLM experimentation suite
+              </p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-normal sm:text-4xl">
+                Compare prompt variants before they become production workflows.
+              </h2>
+              <p className="mt-4 max-w-3xl text-base leading-8 text-black/60">
+                Run A/B prompt variants across model adapters, inspect cost and latency,
+                and promote the prompt with the best quality and lowest risk.
+              </p>
+            </div>
+            <dl className="grid grid-cols-2 gap-3">
+              <Metric label="Avg latency" value={averageLatency} suffix="ms" />
+              <Metric label="Results" value={results.length} />
+              <CostMetric label="Est. cost" value={totalCost} />
+              <Metric label="Winner" value={bestResult?.qualityScore ?? 0} suffix="/100" />
+            </dl>
+          </div>
+        </section>
+
+        {selectedExperiment ? (
+          <Panel title={selectedExperiment.title} icon={Workflow}>
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div>
+                <div className="rounded-lg border border-black/10 bg-white p-5">
+                  <p className="text-sm font-semibold uppercase tracking-[0.14em] text-black/45">
+                    Hypothesis
+                  </p>
+                  <p className="mt-3 text-lg leading-8 text-black/70">
+                    {selectedExperiment.hypothesis}
+                  </p>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <button
+                      className="btn-primary"
+                      onClick={() => onRunExperiment(selectedExperiment)}
+                      disabled={experimentRunning || evaluationModels.length === 0}
+                    >
+                      {experimentRunning ? (
+                        <Loader2 className="animate-spin" size={16} aria-hidden="true" />
+                      ) : (
+                        <BarChart3 size={16} aria-hidden="true" />
+                      )}
+                      Run experiment
+                    </button>
+                    <button className="btn-secondary" onClick={onCreateExperiment}>
+                      <Workflow size={16} aria-hidden="true" />
+                      Fork current prompt
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  {selectedExperiment.variants.map((variant) => {
+                    const variantResults = results.filter(
+                      (result) => result.variantId === variant.id,
+                    );
+                    const avgScore = variantResults.length
+                      ? Math.round(
+                          variantResults.reduce(
+                            (total, result) => total + result.qualityScore,
+                            0,
+                          ) / variantResults.length,
+                        )
+                      : 0;
+
+                    return (
+                      <VariantCard
+                        key={variant.id}
+                        variant={variant}
+                        averageScore={avgScore}
+                        isWinner={bestResult?.variantId === variant.id}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-black/10 bg-white p-5">
+                <p className="text-sm font-semibold">Runtime input</p>
+                <textarea
+                  className="input mt-3 min-h-40 resize-y leading-6"
+                  value={testInput}
+                  onChange={(event) => onTestInputChange(event.target.value)}
+                />
+                <div className="mt-4 space-y-2">
+                  {modelCatalog.map((model) => (
+                    <label
+                      key={model.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-black/10 px-3 py-3 text-sm"
+                    >
+                      <span>
+                        <span className="font-semibold">{model.label}</span>
+                        <span className="ml-2 text-xs text-black/45">
+                          {model.status}
+                        </span>
+                      </span>
+                      <input
+                        className="accent-[#0f766e]"
+                        type="checkbox"
+                        checked={evaluationModels.includes(model.id)}
+                        onChange={(event) => onToggleModel(model.id, event.target.checked)}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {results.length ? (
+              <div className="mt-6">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <h3 className="text-xl font-semibold">Experiment results</h3>
+                  <span className="rounded-full bg-black px-3 py-1 text-xs font-semibold text-white">
+                    Winner: {bestResult?.variantLabel ?? "pending"}
+                  </span>
+                </div>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  {results.map((result) => (
+                    <ExperimentResultCard key={result.id} result={result} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6 rounded-lg border border-dashed border-black/20 bg-white p-8 text-center">
+                <p className="text-lg font-semibold">No experiment run yet</p>
+                <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-black/60">
+                  Run this experiment to generate output panels, quality metrics,
+                  token estimates, cost visibility, and hallucination-risk signals.
+                </p>
+              </div>
+            )}
+          </Panel>
+        ) : (
+          <Panel title="Create an experiment" icon={Workflow}>
+            <button className="btn-primary" onClick={onCreateExperiment}>
+              <Plus size={16} aria-hidden="true" />
+              New experiment from {selectedPrompt?.title ?? "selected prompt"}
+            </button>
+          </Panel>
+        )}
+
+        <Panel title="Side-by-side Evaluation Suite" icon={Brain}>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex rounded-lg border border-black/10 bg-[#f7f8fb] p-1">
+              {(["output", "metrics", "notes"] as EvaluationTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  className={clsx(
+                    "rounded-lg px-3 py-2 text-xs font-semibold capitalize",
+                    evaluationTab === tab ? "bg-black text-white" : "text-black/55",
+                  )}
+                  onClick={() => onEvaluationTabChange(tab)}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            <button
+              className="btn-primary"
+              onClick={onRunEvaluation}
+              disabled={evaluating || evaluationModels.length === 0}
+            >
+              {evaluating ? (
+                <Loader2 className="animate-spin" size={16} aria-hidden="true" />
+              ) : (
+                <BarChart3 size={16} aria-hidden="true" />
+              )}
+              Compare selected models
+            </button>
+          </div>
+
+          {evaluationResults.length ? (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {evaluationResults.map((evaluation) => (
+                <EvaluationCard
+                  key={evaluation.id}
+                  evaluation={evaluation}
+                  tab={evaluationTab}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-black/20 bg-white p-8 text-center">
+              <p className="text-lg font-semibold">Run an evaluation to compare model behavior.</p>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-black/60">
+                This suite shows output panels, latency badges, token estimates,
+                estimated cost, quality sub-scores, and expandable notes.
+              </p>
+            </div>
+          )}
+        </Panel>
+      </div>
+    </section>
+  );
+}
+
+function VariantCard({
+  variant,
+  averageScore,
+  isWinner,
+}: {
+  variant: PromptExperimentVariant;
+  averageScore: number;
+  isWinner: boolean;
+}) {
+  return (
+    <article className="rounded-lg border border-black/10 bg-white p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-lg font-semibold">{variant.label}</p>
+          <p className="mt-1 text-sm text-black/50">{variant.notes}</p>
+        </div>
+        {isWinner ? (
+          <span className="rounded-full bg-[#ecfdf5] px-3 py-1 text-xs font-semibold text-[#0f766e]">
+            winner
+          </span>
+        ) : null}
+      </div>
+      <pre className="mt-4 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-[#0b1120] p-4 text-xs leading-5 text-white">
+        {variant.content}
+      </pre>
+      <dl className="mt-4 grid grid-cols-3 gap-2 text-xs">
+        <Info label="Model" value={variant.model} />
+        <Info label="Temp" value={`${variant.temperature}`} />
+        <Info label="Avg score" value={`${averageScore || "Pending"}`} />
+      </dl>
+    </article>
+  );
+}
+
+function ExperimentResultCard({ result }: { result: PromptExperimentResult }) {
+  return (
+    <article className="rounded-lg border border-black/10 bg-white p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-base font-semibold">
+            {result.variantLabel} · {result.model}
+          </p>
+          <p className="mt-1 text-xs uppercase tracking-[0.14em] text-black/45">
+            {result.provider}
+          </p>
+        </div>
+        <span className="rounded-full bg-black px-3 py-1 text-xs font-semibold text-white">
+          {result.qualityScore}/100
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+        <Info label="Latency" value={`${result.latencyMs}ms`} />
+        <Info label="Tokens" value={`${result.tokenEstimate}`} />
+        <Info label="Cost" value={formatCost(result.estimatedCostUsd)} />
+        <Info label="Risk" value={`${result.hallucinationRisk}%`} />
+      </div>
+      <details className="mt-4 rounded-lg border border-black/10 bg-[#f7f8fb] p-4">
+        <summary className="cursor-pointer text-sm font-semibold">
+          Expand output comparison
+        </summary>
+        <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap text-sm leading-6 text-black/72">
+          {result.output}
+        </pre>
+      </details>
+    </article>
+  );
+}
+
 function EvaluationCard({
   evaluation,
   tab,
@@ -2287,38 +3002,61 @@ function EvaluationCard({
   tab: EvaluationTab;
 }) {
   return (
-    <article className="rounded-lg border border-black/10 bg-white p-3">
-      <div className="flex items-start justify-between gap-3">
+    <article className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold">{evaluation.model}</p>
+          <p className="text-lg font-semibold">{evaluation.model}</p>
           <p className="mt-1 text-xs uppercase tracking-[0.14em] text-black/45">
             {evaluation.provider}
           </p>
         </div>
-        <span className="rounded-md bg-[#ecfdf5] px-2 py-1 text-xs font-semibold text-[#0f766e]">
+        <span className="rounded-full bg-[#ecfdf5] px-3 py-1 text-xs font-semibold text-[#0f766e]">
           {evaluation.qualityScore}/100
         </span>
       </div>
+      <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+        <Info label="Latency" value={`${evaluation.latencyMs}ms`} />
+        <Info label="Tokens" value={`${evaluation.tokenEstimate}`} />
+        <Info label="Cost" value={formatCost(evaluation.estimatedCostUsd)} />
+        <Info label="Length" value={`${evaluation.outputLength}`} />
+      </div>
       {tab === "output" ? (
-        <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-[#0b1120] p-3 text-xs leading-5 text-white">
+        <pre className="mt-4 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg bg-[#0b1120] p-4 text-sm leading-6 text-white">
           {evaluation.output}
         </pre>
       ) : null}
       {tab === "metrics" ? (
-        <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
-          <Info label="Latency" value={`${evaluation.latencyMs}ms`} />
-          <Info label="Tokens" value={`${evaluation.tokenEstimate}`} />
-          <Info label="Length" value={`${evaluation.outputLength}`} />
-        </dl>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <ScoreBar label="Clarity" value={evaluation.qualityMetrics.clarity} />
+          <ScoreBar label="Completeness" value={evaluation.qualityMetrics.completeness} />
+          <ScoreBar label="Risk control" value={evaluation.qualityMetrics.riskControl} />
+        </div>
       ) : null}
       {tab === "notes" ? (
-        <ul className="mt-3 space-y-1 text-sm leading-6 text-black/65">
+        <ul className="mt-4 space-y-2 text-sm leading-6 text-black/65">
           {evaluation.notes.map((note) => (
             <li key={note}>- {note}</li>
           ))}
         </ul>
       ) : null}
     </article>
+  );
+}
+
+function ScoreBar({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-black/10 bg-[#f7f8fb] p-4">
+      <div className="flex items-center justify-between text-sm font-semibold">
+        <span>{label}</span>
+        <span>{value}/100</span>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/10">
+        <div
+          className="h-full rounded-full bg-[#0f766e]"
+          style={{ width: `${Math.max(4, Math.min(100, value))}%` }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -2354,6 +3092,7 @@ function AnalyticsDashboard({
     latencyEvents: { name: string; latency: number }[];
     favoritePrompts: { name: string; runs: number }[];
     averageLatency: number;
+    totalEstimatedCost: number;
   };
   activities: PromptActivity[];
 }) {
@@ -2418,6 +3157,14 @@ function AnalyticsDashboard({
       </Panel>
 
       <Panel title="Activity Timeline" icon={Activity}>
+        <div className="mb-4 rounded-lg border border-black/10 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/45">
+            Estimated provider usage
+          </p>
+          <p className="mt-2 text-2xl font-semibold">
+            {formatCost(analytics.totalEstimatedCost)}
+          </p>
+        </div>
         <div className="space-y-2">
           {activities.slice(0, 10).map((activity) => (
             <div key={activity.id} className="rounded-lg border border-black/10 bg-white p-3">
@@ -2574,8 +3321,8 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-black/10 bg-[#f8fafc] p-3 shadow-sm">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+    <section className="rounded-lg border border-black/10 bg-white/78 p-5 shadow-sm shadow-black/[0.03] backdrop-blur">
+      <div className="mb-5 flex items-center gap-2 text-sm font-semibold">
         <Icon size={16} aria-hidden="true" />
         {title}
       </div>
@@ -2715,18 +3462,44 @@ function IconButton({
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({
+  label,
+  value,
+  suffix = "",
+}: {
+  label: string;
+  value: number;
+  suffix?: string;
+}) {
   return (
-    <div className="rounded-lg border border-black/10 bg-white p-3">
-      <dt className="text-xs font-medium text-black/50">{label}</dt>
-      <dd className="mt-1 text-2xl font-semibold">{value}</dd>
+    <div className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+      <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-black/45">
+        {label}
+      </dt>
+      <dd className="mt-2 text-3xl font-semibold tracking-normal">
+        {value}
+        {suffix ? <span className="text-base text-black/45">{suffix}</span> : null}
+      </dd>
+    </div>
+  );
+}
+
+function CostMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+      <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-black/45">
+        {label}
+      </dt>
+      <dd className="mt-2 text-2xl font-semibold tracking-normal">
+        {formatCost(value)}
+      </dd>
     </div>
   );
 }
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-black/[0.04] p-2">
+    <div className="rounded-lg bg-black/[0.04] p-3">
       <dt className="font-medium text-black/45">{label}</dt>
       <dd className="mt-1 truncate font-semibold text-black/75">{value}</dd>
     </div>

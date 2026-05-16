@@ -1,11 +1,12 @@
 # PromptDeck AI — PromptOps Platform Architecture
 
-PromptDeck AI — PromptOps Platform positions prompt management as AI workflow infrastructure: teams capture prompts, manage variables, version changes, run evaluations, optimize prompt quality, share collections, and observe usage.
+PromptDeck AI — PromptOps Platform positions prompt work as LLM operations infrastructure: teams capture workflows, manage variables, version changes, run experiments, evaluate model behavior, optimize prompt quality, share collections, and observe usage, cost, and latency.
 
 ## Product Surface
 
 - PromptOps console: CRUD, search, favorites, sharing, export, variables, and versioning
-- AI Lab: test prompts, compare model adapters, inspect metrics, and optimize prompts
+- Experiments: compare prompt variants, inspect winners, review expandable outputs, and track latency/token/cost tradeoffs
+- AI evaluation suite: test prompts, compare model adapters, inspect metrics, and optimize prompts
 - Analytics: category usage, frequency, latency, favorites, and activity timelines
 - Team foundations: workspaces, members, roles, invites, and shared collections
 
@@ -52,6 +53,9 @@ sequenceDiagram
   AI-->>API: Outputs and metrics
   API-->>UI: Evaluation cards
   UI->>DB: Persist evaluation history when signed in
+  User->>UI: Run prompt experiment
+  UI->>API: Evaluate variants through adapter layer
+  UI->>DB: Persist experiment, variants, result metrics, token and cost estimates
 ```
 
 ## ERD
@@ -63,6 +67,7 @@ erDiagram
   profiles ||--o{ prompt_runs : records
   profiles ||--o{ prompt_versions : snapshots
   profiles ||--o{ prompt_evaluations : evaluates
+  profiles ||--o{ prompt_experiments : owns
   profiles ||--o{ workspaces : owns
   workspaces ||--o{ workspace_members : includes
   workspaces ||--o{ workspace_invites : invites
@@ -71,6 +76,9 @@ erDiagram
   prompts ||--o{ prompt_versions : versions
   prompts ||--o{ prompt_runs : tests
   prompts ||--o{ prompt_evaluations : benchmarks
+  prompts ||--o{ prompt_experiments : experiments
+  prompt_experiments ||--o{ prompt_experiment_variants : compares
+  prompt_experiment_variants ||--o{ prompt_experiment_results : produces
   prompt_collections ||--o{ collection_prompts : contains
   prompts ||--o{ collection_prompts : listed
 ```
@@ -96,6 +104,7 @@ flowchart LR
 - Supabase browser keys are public by design and protected by RLS.
 - Live provider spend requires a Supabase session.
 - Prompt/evaluation payloads are validated with Zod.
+- Evaluation responses include estimated input tokens, output tokens, output length, latency, quality sub-scores, and estimated cost.
 - Production responses set CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, and COOP.
 - New PromptOps tables include RLS policies for owner/member access.
 
@@ -103,7 +112,8 @@ flowchart LR
 
 - Dashboard queries remain scoped by `user_id` or workspace membership.
 - Prompt search uses generated full-text vectors and GIN indexes.
-- Prompt versions and evaluations are append-oriented for auditability.
+- Prompt versions, evaluations, and experiment results are append-oriented for auditability.
 - Upstash Redis rate limits work across serverless regions.
 - Background job abstraction can be swapped from inline execution to queue workers.
+- Experiment result tables are separated from variants so high-volume benchmark history can be paginated, archived, or moved to warehouse storage.
 - Large workspaces should move from load-more UI to cursor pagination backed by `(workspace_id, updated_at, id)` indexes.

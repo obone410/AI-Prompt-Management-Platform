@@ -38,6 +38,35 @@ function scoreOutput(output: string, prompt: string) {
   );
 }
 
+function scoreMetrics(output: string, prompt: string) {
+  const hasStructure = /(^|\n)(#+|\d+\.|-|\*)\s/.test(output);
+  const hasSpecifics = output.length > 240;
+  const avoidsHedge =
+    !/\b(maybe|probably|it depends|as an ai language model)\b/i.test(output);
+  const hasRiskBoundary = /risk|assumption|source|evidence|missing/i.test(output + prompt);
+
+  return {
+    clarity: Math.min(98, 58 + (hasStructure ? 22 : 0) + (avoidsHedge ? 10 : 0)),
+    completeness: Math.min(98, 55 + (hasSpecifics ? 25 : 0) + (hasStructure ? 8 : 0)),
+    riskControl: Math.min(98, 52 + (hasRiskBoundary ? 28 : 0) + (avoidsHedge ? 8 : 0)),
+  };
+}
+
+function estimateCost(model: string, inputTokens: number, outputTokens: number) {
+  const option = modelCatalog.find((item) => item.id === model);
+
+  if (!option) {
+    return 0;
+  }
+
+  return Number(
+    (
+      (inputTokens / 1_000_000) * option.inputUsdPer1MTokens +
+      (outputTokens / 1_000_000) * option.outputUsdPer1MTokens
+    ).toFixed(6),
+  );
+}
+
 function demoEvaluation({ prompt, input, model }: EvaluationRequest) {
   const option = modelCatalog.find((item) => item.id === model);
   const provider = option?.provider ?? "openai";
@@ -53,6 +82,8 @@ function demoEvaluation({ prompt, input, model }: EvaluationRequest) {
     "- Apply the prompt constraints in order.",
     "- Return a concise, reusable output with measurable next steps.",
   ].join("\n");
+  const inputTokenEstimate = estimateTokens(prompt + input);
+  const outputTokenEstimate = estimateTokens(output);
 
   return {
     id: crypto.randomUUID(),
@@ -60,9 +91,13 @@ function demoEvaluation({ prompt, input, model }: EvaluationRequest) {
     provider,
     output,
     latencyMs: 120 + model.length * 17,
-    tokenEstimate: estimateTokens(prompt + input + output),
+    inputTokenEstimate,
+    outputTokenEstimate,
+    tokenEstimate: inputTokenEstimate + outputTokenEstimate,
+    estimatedCostUsd: estimateCost(model, inputTokenEstimate, outputTokenEstimate),
     outputLength: output.length,
     qualityScore: scoreOutput(output, prompt),
+    qualityMetrics: scoreMetrics(output, prompt),
     notes:
       provider === "openai"
         ? ["Demo mode used; no provider spend."]
@@ -89,6 +124,8 @@ export async function runModelEvaluation(request: EvaluationRequest) {
     ...(supportsTemperature(request.model) ? { temperature: 0.35 } : {}),
   });
   const output = response.output_text;
+  const inputTokenEstimate = estimateTokens(request.prompt + request.input);
+  const outputTokenEstimate = estimateTokens(output);
 
   return {
     id: crypto.randomUUID(),
@@ -96,9 +133,13 @@ export async function runModelEvaluation(request: EvaluationRequest) {
     provider: "openai",
     output,
     latencyMs: Math.round(performance.now() - startedAt),
-    tokenEstimate: estimateTokens(request.prompt + request.input + output),
+    inputTokenEstimate,
+    outputTokenEstimate,
+    tokenEstimate: inputTokenEstimate + outputTokenEstimate,
+    estimatedCostUsd: estimateCost(request.model, inputTokenEstimate, outputTokenEstimate),
     outputLength: output.length,
     qualityScore: scoreOutput(output, request.prompt),
+    qualityMetrics: scoreMetrics(output, request.prompt),
     notes: ["Live OpenAI response captured server-side."],
   } satisfies EvaluationResult;
 }

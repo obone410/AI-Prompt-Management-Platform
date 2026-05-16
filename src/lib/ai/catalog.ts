@@ -6,6 +6,8 @@ export type AIModelOption = {
   provider: AIProvider;
   family: "GPT" | "Claude" | "Gemini";
   status: "live" | "adapter";
+  inputUsdPer1MTokens: number;
+  outputUsdPer1MTokens: number;
 };
 
 export type EvaluationResult = {
@@ -14,9 +16,17 @@ export type EvaluationResult = {
   provider: AIProvider | "demo";
   output: string;
   latencyMs: number;
+  inputTokenEstimate: number;
+  outputTokenEstimate: number;
   tokenEstimate: number;
+  estimatedCostUsd: number;
   outputLength: number;
   qualityScore: number;
+  qualityMetrics: {
+    clarity: number;
+    completeness: number;
+    riskControl: number;
+  };
   notes: string[];
 };
 
@@ -36,6 +46,8 @@ export const modelCatalog: AIModelOption[] = [
     provider: "openai",
     family: "GPT",
     status: "live",
+    inputUsdPer1MTokens: 1.25,
+    outputUsdPer1MTokens: 10,
   },
   {
     id: "gpt-4.1",
@@ -43,6 +55,8 @@ export const modelCatalog: AIModelOption[] = [
     provider: "openai",
     family: "GPT",
     status: "live",
+    inputUsdPer1MTokens: 2,
+    outputUsdPer1MTokens: 8,
   },
   {
     id: "claude-sonnet-4.5",
@@ -50,6 +64,8 @@ export const modelCatalog: AIModelOption[] = [
     provider: "anthropic",
     family: "Claude",
     status: "adapter",
+    inputUsdPer1MTokens: 3,
+    outputUsdPer1MTokens: 15,
   },
   {
     id: "gemini-2.5-pro",
@@ -57,5 +73,7 @@ export const modelCatalog: AIModelOption[] = [
     provider: "google",
     family: "Gemini",
     status: "adapter",
+    inputUsdPer1MTokens: 1.25,
+    outputUsdPer1MTokens: 10,
   },
 ];

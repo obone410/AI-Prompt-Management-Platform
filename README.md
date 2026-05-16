@@ -1,6 +1,6 @@
 # PromptDeck AI — PromptOps Platform
 
-A production-minded PromptOps platform for managing, versioning, testing, optimizing, sharing, and evaluating reusable AI prompts.
+A production-minded LLM operations platform for versioning, testing, optimizing, experimenting with, sharing, and evaluating reusable AI workflows.
 
 PromptDeck AI — PromptOps Platform is built as the actual SaaS console, not a marketing landing page. It runs in local demo mode without paid provider access, and it can persist prompts, versions, evaluations, categories, runs, and collaboration foundations to Supabase when production credentials and migrations are configured.
 
@@ -14,6 +14,10 @@ PromptDeck AI — PromptOps Platform is built as the actual SaaS console, not a 
 
 ![PromptDeck AI PromptOps Platform desktop dashboard](docs/screenshots/dashboard-desktop.png)
 
+### Experiments
+
+![PromptDeck AI PromptOps Platform experiments suite](docs/screenshots/experiments-desktop.png)
+
 ### Mobile
 
 ![PromptDeck AI PromptOps Platform mobile dashboard](docs/screenshots/dashboard-mobile.png)
@@ -25,11 +29,12 @@ PromptDeck AI — PromptOps Platform is built as the actual SaaS console, not a 
 ## Production Features
 
 - PromptOps command center with CRUD, search, filters, favorites, sharing, export, and Cmd+K actions
+- Prompt Experiments workspace for A/B prompt variants, hypotheses, winners, expandable outputs, and model comparisons
 - Full prompt versioning foundations with `prompt_versions`, automatic Supabase edit snapshots, local version notes, rollback, and git-style diffs
 - Dynamic `{{variable}}` detection, generated input forms, validation, and live rendered prompt preview
 - AI-assisted prompt optimization with structure, clarity, variable, and hallucination-risk suggestions
 - Side-by-side model evaluation across GPT, Claude, and Gemini adapter abstractions
-- Evaluation cards with output, metrics, notes, latency, token estimates, output length, and heuristic quality score
+- Evaluation cards with output, metrics, notes, latency, token estimates, cost estimates, output length, and heuristic quality score
 - Analytics dashboard with usage frequency, category usage, average latency, favorite prompt charts, and recent activity
 - Workspace, shared collection, team role, ownership, and mock invite foundations
 - Server-only provider calls, Zod validation, protected live AI routes, RLS-first schema, and secure env handling
@@ -60,10 +65,11 @@ PromptDeck AI — PromptOps Platform is built as the actual SaaS console, not a 
 flowchart LR
   Capture["Capture prompt idea"] --> Structure["Add variables and output contract"]
   Structure --> Version["Save version and changelog"]
-  Version --> Evaluate["Evaluate across model adapters"]
+  Version --> Experiment["Run prompt experiments"]
+  Experiment --> Evaluate["Evaluate across model adapters"]
   Evaluate --> Optimize["AI-assisted optimization"]
-  Optimize --> Share["Share collection or public slug"]
-  Share --> Observe["Track usage, latency, score, activity"]
+  Optimize --> Deploy["Promote workflow"]
+  Deploy --> Observe["Track usage, cost, latency, score, activity"]
   Observe --> Version
 ```
 
@@ -83,6 +89,7 @@ flowchart TD
   SupabaseClient --> RLS["Supabase Postgres + RLS"]
   RLS --> Versions["prompt_versions"]
   RLS --> Evaluations["prompt_evaluations"]
+  RLS --> Experiments["prompt_experiments"]
   RLS --> Workspaces["workspaces and collections"]
 ```
 
@@ -100,6 +107,9 @@ Core tables:
 - `prompt_runs`
 - `prompt_versions`
 - `prompt_evaluations`
+- `prompt_experiments`
+- `prompt_experiment_variants`
+- `prompt_experiment_results`
 - `prompt_activity`
 - `workspaces`
 - `workspace_members`
@@ -107,7 +117,7 @@ Core tables:
 - `prompt_collections`
 - `collection_prompts`
 
-Scale-oriented indexes cover user dashboards, categories, favorites, tags, full-text search, public share slugs, prompt versions, evaluations, activity timelines, and workspace membership.
+Scale-oriented indexes cover user dashboards, categories, favorites, tags, full-text search, public share slugs, prompt versions, evaluations, experiment results, activity timelines, and workspace membership.
 
 See [docs/SUPABASE.md](docs/SUPABASE.md) for the RLS policy matrix and migration order.
 
@@ -169,7 +179,7 @@ Current audit result:
 found 0 vulnerabilities
 ```
 
-Browser QA covers the demo auth path, prompt optimization, side-by-side evaluation, analytics tab, team tab, and shared prompt route.
+Browser QA covers the demo auth path, prompt optimization, side-by-side evaluation, experiments tab, analytics tab, team tab, and shared prompt route.
 
 ## Deployment
 

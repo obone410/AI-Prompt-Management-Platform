@@ -9,8 +9,9 @@ Apply migrations in filename order:
 1. `202605150001_initial_promptdeck_schema.sql`
 2. `202605160001_harden_public_prompt_sharing.sql`
 3. `202605160002_promptops_operating_system.sql`
+4. `202605160003_prompt_experiments_costs.sql`
 
-The first migration creates the original prompt workspace. The second tightens public sharing so anonymous users cannot list all public prompts from `prompts`. The third adds PromptOps production foundations: workspaces, members, collections, versions, evaluations, activity, invites, Redis-ready API architecture support, and automatic version snapshots.
+The first migration creates the original prompt workspace. The second tightens public sharing so anonymous users cannot list all public prompts from `prompts`. The third adds PromptOps production foundations: workspaces, members, collections, versions, evaluations, activity, invites, Redis-ready API architecture support, and automatic version snapshots. The fourth adds experiment tables plus token and cost columns for evaluation visibility.
 
 ## Tables
 
@@ -19,7 +20,10 @@ The first migration creates the original prompt workspace. The second tightens p
 - `prompts`: prompt content, model settings, search vector, favorite state, and share slug
 - `prompt_runs`: single prompt test history
 - `prompt_versions`: historical prompt snapshots with changelog notes
-- `prompt_evaluations`: side-by-side model benchmark results
+- `prompt_evaluations`: side-by-side model benchmark results with latency, token, cost, and quality metrics
+- `prompt_experiments`: LLM experiment hypotheses and status
+- `prompt_experiment_variants`: prompt A/B variants linked to experiments
+- `prompt_experiment_results`: model outputs, latency, tokens, cost, quality score, and hallucination-risk metrics
 - `prompt_activity`: workspace activity timeline events
 - `workspaces`: ownership boundary for teams
 - `workspace_members`: team role assignments
@@ -37,6 +41,9 @@ The first migration creates the original prompt workspace. The second tightens p
 | `prompt_runs` | Owner-only read/insert/delete. |
 | `prompt_versions` | Owner or workspace member read; owner insert; automatic trigger snapshots on prompt edits. |
 | `prompt_evaluations` | Owner or workspace member read; owner insert. |
+| `prompt_experiments` | Owner or workspace member read; owner insert/update. |
+| `prompt_experiment_variants` | Read/write through experiment ownership and workspace membership. |
+| `prompt_experiment_results` | Owner or workspace member read; owner insert. |
 | `prompt_activity` | Owner or workspace member read; owner insert. |
 | `workspaces` | Owner/member read; owner write. |
 | `workspace_members` | Workspace members can read; owner manages. |
@@ -75,7 +82,8 @@ The app also keeps local demo-mode versions with user-facing changelog notes and
 - Full-text search: `prompts_search_document_idx`
 - Run history: `prompt_runs_prompt_created_idx`, `prompt_runs_user_created_idx`
 - Versions: `prompt_versions_prompt_idx`
-- Evaluations: `prompt_evaluations_prompt_idx`, `prompt_evaluations_user_idx`
+- Evaluations: `prompt_evaluations_prompt_idx`, `prompt_evaluations_user_idx`, `prompt_evaluations_cost_idx`
+- Experiments: `prompt_experiments_workspace_idx`, `prompt_experiments_user_idx`, `prompt_experiment_variants_experiment_idx`, `prompt_experiment_results_experiment_idx`, `prompt_experiment_results_variant_idx`
 - Workspaces: `workspaces_owner_idx`, `workspace_members_user_idx`
 - Activity: `prompt_activity_workspace_idx`
 

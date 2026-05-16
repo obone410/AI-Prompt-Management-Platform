@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     const request = {
       model,
       instructions:
-        "You are testing a saved prompt in a prompt management platform. Follow the saved prompt exactly and return the result only.",
+        "You are testing a saved prompt in a PromptOps platform. Follow the saved prompt exactly and return the result only.",
       input: prompt.replace(/\{\{input\}\}/g, input || ""),
       max_output_tokens: 900,
       store: false,
