@@ -30,23 +30,35 @@ Prompt -> Version -> Benchmark -> Workflow -> Agent -> Release -> Trace -> Impro
 
 Instead of treating prompts, experiments, agents, workflows, and observability as separate tools, PromptDeck AI connects them through one execution backbone. Every AI action can become a run, every run can produce trace data, every output can become an artifact, and every artifact can be measured for latency, cost, quality, and reliability.
 
-## Product Tour
+## Visual Tour
 
-![PromptDeck AI product tour](docs/demos/promptops-demo.gif)
+### Product Walkthrough
 
-## Screenshots
+<p align="center">
+  <img src="docs/demos/promptops-demo.gif" alt="PromptDeck AI product tour" width="100%">
+</p>
 
-<p>
+### Command Center
+
+<p align="center">
   <img src="docs/screenshots/readme-dashboard.png" alt="PromptDeck AI command center" width="100%">
 </p>
+
+### Core Workspaces
 
 | Benchmarking Engine | Agent Runtime |
 | --- | --- |
 | <img src="docs/screenshots/readme-benchmarks.png" alt="Dataset-driven benchmarking and model comparison" width="100%"> | <img src="docs/screenshots/readme-agents.png" alt="Agent runtime builder with trace timeline" width="100%"> |
 
-| Observability Center | Mobile Layout |
+| Workflow Studio | Observability Center |
 | --- | --- |
-| <img src="docs/screenshots/readme-observability.png" alt="LangSmith-style trace observability center" width="100%"> | <img src="docs/screenshots/readme-mobile.png" alt="Responsive PromptDeck AI mobile command center" width="48%"> |
+| <img src="docs/screenshots/workflows-desktop.png" alt="Workflow studio with execution logs" width="100%"> | <img src="docs/screenshots/readme-observability.png" alt="LangSmith-style trace observability center" width="100%"> |
+
+### Responsive Mobile
+
+<p align="center">
+  <img src="docs/screenshots/readme-mobile.png" alt="Responsive PromptDeck AI mobile command center" width="320">
+</p>
 
 ## Highlights
 
