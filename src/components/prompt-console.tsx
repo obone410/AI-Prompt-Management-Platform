@@ -5769,8 +5769,8 @@ function StatusBadge({
   return (
     <span
       className={clsx(
-        "inline-flex h-10 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-black/70 shadow-sm shadow-black/[0.02]",
-        className,
+        "h-10 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-black/70 shadow-sm shadow-black/[0.02]",
+        className ?? "inline-flex",
       )}
     >
       <Icon size={15} aria-hidden="true" />

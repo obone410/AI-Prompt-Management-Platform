@@ -24,7 +24,7 @@ Coverage:
 - Analytics and Team tabs render from the production build.
 - Shared prompt page renders the public prompt preview.
 - Screenshots were refreshed from a production build on 2026-05-17.
-- Header alignment and mobile metric layout were rechecked after the frontend fit pass; mobile viewport overflow returned `0px`.
+- Header alignment, non-scrolling navigation, and mobile metric layout were rechecked after the frontend fit pass; mobile viewport overflow returned `0px`.
 - Animated demo GIF was generated from real browser frames.
 - Playwright e2e forces demo mode on its own port so tests do not depend on paid AI quota.
 
