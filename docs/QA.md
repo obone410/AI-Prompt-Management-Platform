@@ -63,8 +63,8 @@ Performance spot check from the 2026-05-17 recheck:
 
 | Route | DOMContentLoaded | Load | FCP | Transferred |
 | --- | ---: | ---: | ---: | ---: |
-| `/` warm cache | 109 ms | 155 ms | 148 ms | 300 B |
-| `/share/product-brief` | 1784 ms | 1857 ms | 1772 ms | 3 KB |
+| `/` warm cache | 211 ms | 228 ms | 228 ms | 300 B |
+| `/share/product-brief` | 1106 ms | 1319 ms | 1120 ms | 3 KB |
 
 ## Command Verification
 
