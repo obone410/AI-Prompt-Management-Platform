@@ -42,7 +42,14 @@ import {
   Workflow,
   type LucideIcon,
 } from "lucide-react";
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bar,
@@ -541,6 +548,7 @@ export function PromptConsole() {
   const [optimization, setOptimization] = useState<PromptOptimizationResult | null>(null);
   const [inviteEmail, setInviteEmail] = useState("teammate@company.com");
   const [toast, setToast] = useState("");
+  const toastTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -596,6 +604,14 @@ export function PromptConsole() {
       subscription?.data.subscription.unsubscribe();
     };
   }, [supabase]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (ready) {
@@ -926,8 +942,15 @@ export function PromptConsole() {
   };
 
   function showToast(message: string) {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+
     setToast(message);
-    window.setTimeout(() => setToast(""), 2600);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast("");
+      toastTimerRef.current = null;
+    }, 2600);
   }
 
   function supabaseUserId() {

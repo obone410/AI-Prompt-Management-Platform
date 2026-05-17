@@ -58,12 +58,12 @@ Result:
 - Demo sign-in rendered `Demo session` and did not create a Supabase account.
 - Operations, Benchmarks, Agents, Workflows, Releases, Observability, Analytics, and Team views opened on production.
 
-Performance spot check:
+Performance spot check from the 2026-05-17 recheck:
 
 | Route | DOMContentLoaded | Load | FCP | Transferred |
 | --- | ---: | ---: | ---: | ---: |
-| `/` | 390 ms | 574 ms | 468 ms | 461 KB |
-| `/share/product-brief` | 1724 ms | 2083 ms | 1732 ms | 12 KB |
+| `/` warm cache | 109 ms | 155 ms | 148 ms | 300 B |
+| `/share/product-brief` | 1784 ms | 1857 ms | 1772 ms | 3 KB |
 
 ## Command Verification
 
@@ -89,7 +89,7 @@ signupRequestCount=0
 
 Latest production scan:
 
-- `docs/SECURITY_AUDIT_2026-05-16.md`
+- `docs/SECURITY_AUDIT_2026-05-17.md`
 
 Summary:
 
