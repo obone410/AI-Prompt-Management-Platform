@@ -23,7 +23,8 @@ Coverage:
 - Release Management renders Development, Staging, and Production lifecycle controls with rollout, health, rollback, and promotion actions.
 - Analytics and Team tabs render from the production build.
 - Shared prompt page renders the public prompt preview.
-- Screenshots were refreshed from a production build.
+- Screenshots were refreshed from a production build on 2026-05-17.
+- Mobile viewport overflow check returned `0px`.
 - Animated demo GIF was generated from real browser frames.
 - Playwright e2e forces demo mode on its own port so tests do not depend on paid AI quota.
 

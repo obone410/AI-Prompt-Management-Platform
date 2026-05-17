@@ -8,6 +8,10 @@ Production: `https://ai-prompt-management-platform.vercel.app`
 
 GitHub: `https://github.com/obone410/AI-Prompt-Management-Platform.git`
 
+## Release State
+
+Backend architecture is frozen for v3.1. The current pass focuses on product polish: cleaner frontend hierarchy, better responsive behavior, refreshed screenshots, tighter documentation, and clean deployment verification.
+
 ## Demo
 
 ![PromptDeck AI demo](docs/demos/promptops-demo.gif)

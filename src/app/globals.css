@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f8fb;
+  --background: #f5f7f9;
   --foreground: #101418;
 }
 
@@ -16,6 +16,12 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  text-rendering: geometricPrecision;
+}
+
+::selection {
+  background: #ccfbf1;
+  color: #0f172a;
 }
 
 button,
@@ -35,19 +41,19 @@ textarea:focus-visible {
 
 @layer components {
   .btn-primary {
-    @apply inline-flex h-11 items-center gap-2 rounded-lg bg-[#111827] px-4 text-sm font-semibold text-white transition hover:bg-[#0f766e] disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#111827] px-4 text-sm font-semibold text-white shadow-sm shadow-black/10 transition hover:-translate-y-0.5 hover:bg-[#0f766e] disabled:cursor-not-allowed disabled:translate-y-0 disabled:opacity-60;
   }
 
   .btn-secondary {
-    @apply inline-flex h-11 items-center gap-2 rounded-lg border border-black/10 bg-white px-4 text-sm font-semibold text-black/75 transition hover:border-black/25 hover:text-black;
+    @apply inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-black/10 bg-white px-4 text-sm font-semibold text-black/75 shadow-sm shadow-black/[0.02] transition hover:-translate-y-0.5 hover:border-black/25 hover:text-black;
   }
 
   .btn-icon {
-    @apply grid size-9 place-items-center rounded-lg border border-black/10 bg-white text-black/65 transition hover:border-black/30 hover:text-black;
+    @apply grid size-9 place-items-center rounded-xl border border-black/10 bg-white text-black/65 shadow-sm shadow-black/[0.02] transition hover:-translate-y-0.5 hover:border-black/30 hover:text-black;
   }
 
   .input {
-    @apply w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-sm text-black shadow-sm transition placeholder:text-black/35 hover:border-black/20 focus:border-[#0f766e];
+    @apply w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-black shadow-sm shadow-black/[0.02] transition placeholder:text-black/35 hover:border-black/20 focus:border-[#0f766e];
   }
 
   .label {
@@ -55,6 +61,6 @@ textarea:focus-visible {
   }
 
   .tag {
-    @apply inline-flex max-w-full items-center rounded-md bg-black/[0.06] px-2 py-1 text-xs font-medium text-black/60;
+    @apply inline-flex max-w-full items-center rounded-lg bg-black/[0.06] px-2.5 py-1 text-xs font-medium text-black/60;
   }
 }

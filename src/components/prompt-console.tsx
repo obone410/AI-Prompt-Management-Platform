@@ -2619,13 +2619,13 @@ export function PromptConsole() {
   ];
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#eefdf8_0,#f7f8fb_28%,#f7f8fb_100%)] text-[var(--foreground)]">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col px-4 py-6 sm:px-6 lg:px-10">
-        <header className="border-b border-black/10 pb-8 pt-3">
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+    <main className="min-h-screen bg-[#f5f7f9] text-[var(--foreground)]">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col px-4 py-7 sm:px-6 lg:px-10">
+        <header className="border-b border-black/10 pb-10 pt-4">
+          <div className="flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-4xl">
               <div className="mb-5 flex items-center gap-3">
-                <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-black text-white shadow-lg shadow-black/10">
+                <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-black text-white shadow-lg shadow-black/10">
                   <Sparkles size={22} aria-hidden="true" />
                 </div>
                 <div className="min-w-0">
@@ -2637,7 +2637,7 @@ export function PromptConsole() {
                   </p>
                 </div>
               </div>
-              <h1 className="text-4xl font-semibold tracking-normal text-black sm:text-5xl lg:text-6xl">
+              <h1 className="text-4xl font-semibold tracking-tight text-black sm:text-5xl lg:text-6xl">
                 PromptDeck AI
               </h1>
               <p className="mt-5 max-w-3xl text-lg leading-8 text-black/60 sm:text-xl">
@@ -2649,12 +2649,13 @@ export function PromptConsole() {
                 <StatusBadge icon={ServerCog} label="Redis rate limits" />
                 <StatusBadge icon={Activity} label="PostHog/Sentry hooks" />
                 <StatusBadge icon={ShieldCheck} label="RLS protected" />
+                <StatusBadge icon={GitBranch} label="Backend frozen" />
                 <StatusBadge icon={CircleDollarSign} label="Cost estimates" />
               </div>
             </div>
 
             <div className="grid min-w-[260px] gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                <Metric label="Prompts" value={stats.prompts} />
+              <Metric label="Prompts" value={stats.prompts} />
               <Metric label="AI runs" value={stats.aiRuns} />
               <Metric label="Workflows" value={stats.workflows} />
               <Metric label="Agents" value={stats.agents} />
@@ -2703,16 +2704,19 @@ export function PromptConsole() {
           </div>
         </header>
 
-        <nav className="flex flex-wrap items-center gap-2 border-b border-black/10 py-4">
+        <nav
+          className="sticky top-0 z-30 -mx-4 flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-black/10 bg-[#f5f7f9]/90 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10"
+          aria-label="Primary workspace views"
+        >
           {viewTabs.map(({ view, icon: TabIcon, label }) => {
             return (
               <button
                 key={view}
                 className={clsx(
-                  "inline-flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-semibold transition",
+                  "inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition",
                   activeView === view
                     ? "border-black bg-black text-white"
-                    : "border-black/10 bg-white/70 text-black/65 hover:bg-white",
+                    : "border-black/10 bg-white/70 text-black/65 hover:-translate-y-0.5 hover:bg-white",
                 )}
                 onClick={() => setActiveView(view)}
               >
@@ -2721,7 +2725,7 @@ export function PromptConsole() {
               </button>
             );
           })}
-          <span className="ml-auto hidden text-xs font-medium uppercase tracking-[0.16em] text-black/40 lg:inline">
+          <span className="ml-auto hidden shrink-0 text-xs font-medium uppercase tracking-[0.16em] text-black/40 2xl:inline">
             N new / E benchmarks / W workflows / A agents / O traces / Cmd+K
           </span>
         </nav>
@@ -2736,8 +2740,8 @@ export function PromptConsole() {
               onOpenAgents={() => setActiveView("agents")}
               onOpenObservability={() => setActiveView("observability")}
             />
-        <section className="grid flex-1 gap-6 py-7 xl:grid-cols-[300px_minmax(0,1fr)_420px]">
-          <aside className="flex min-w-0 flex-col gap-4">
+        <section className="grid flex-1 gap-8 py-9 xl:grid-cols-[280px_minmax(0,1fr)_390px]">
+          <aside className="flex min-w-0 flex-col gap-5 xl:sticky xl:top-24 xl:self-start">
             <Panel title="Account" icon={Lock}>
               {session ? (
                 <div className="space-y-3">
@@ -2839,7 +2843,7 @@ export function PromptConsole() {
             </Panel>
           </aside>
 
-          <section className="grid min-w-0 gap-4 lg:grid-cols-[minmax(280px,0.92fr)_minmax(340px,1.08fr)]">
+          <section className="grid min-w-0 gap-5 lg:grid-cols-[minmax(280px,0.88fr)_minmax(340px,1.12fr)]">
             <Panel title="Library" icon={Search}>
               <div className="space-y-3">
                 <label className="relative block">
@@ -2872,7 +2876,7 @@ export function PromptConsole() {
                   />
                 </div>
 
-                <div className="max-h-[640px] space-y-2 overflow-y-auto pr-1">
+                <div className="max-h-[720px] space-y-3 overflow-y-auto pr-1">
                   {visiblePrompts.map((prompt) => {
                     const category = categoryById.get(prompt.categoryId);
                     const active = selectedPrompt?.id === prompt.id;
@@ -2881,10 +2885,10 @@ export function PromptConsole() {
                       <article
                         key={prompt.id}
                         className={clsx(
-                          "rounded-lg border bg-white p-3 transition",
+                          "rounded-2xl border bg-white p-4 transition",
                           active
-                            ? "border-black shadow-sm"
-                            : "border-black/10 hover:border-black/25",
+                            ? "border-black shadow-md shadow-black/[0.05]"
+                            : "border-black/10 hover:-translate-y-0.5 hover:border-black/25 hover:shadow-sm",
                         )}
                       >
                         <button
@@ -2906,7 +2910,7 @@ export function PromptConsole() {
                               {prompt.usageCount} runs
                             </span>
                           </div>
-                          <h2 className="line-clamp-2 text-base font-semibold">
+                          <h2 className="line-clamp-2 text-lg font-semibold leading-6">
                             {prompt.title}
                           </h2>
                           <p className="mt-1 line-clamp-2 text-sm leading-6 text-black/60">
@@ -2981,7 +2985,7 @@ export function PromptConsole() {
             </Panel>
 
             <Panel title={editingPromptId ? "Edit Prompt" : "Prompt Builder"} icon={WandSparkles}>
-              <form className="space-y-3" onSubmit={savePrompt}>
+              <form className="space-y-4" onSubmit={savePrompt}>
                 <TextInput label="Title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} />
                 <TextInput
                   label="Description"
@@ -3024,7 +3028,7 @@ export function PromptConsole() {
                   />
                 </label>
 
-                <div className="rounded-lg border border-black/10 bg-white p-3">
+                <div className="rounded-2xl border border-black/10 bg-white p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 text-sm font-semibold">
                       <Variable size={15} aria-hidden="true" />
@@ -3204,7 +3208,7 @@ export function PromptConsole() {
             </Panel>
           </section>
 
-          <aside className="min-w-0">
+          <aside className="min-w-0 xl:sticky xl:top-24 xl:self-start">
             <Panel title="AI Test Bench" icon={Bot}>
               {selectedPrompt ? (
                 <div className="space-y-4">
@@ -3335,7 +3339,7 @@ export function PromptConsole() {
                     </div>
                   ) : null}
 
-                  <div className="min-h-44 rounded-lg border border-black/10 bg-[#101828] p-4 text-sm leading-6 text-white">
+                  <div className="min-h-52 rounded-2xl border border-black/10 bg-[#101828] p-4 text-sm leading-6 text-white shadow-inner">
                     {testOutput || "Run a test to see the AI response here."}
                   </div>
 
@@ -3660,16 +3664,20 @@ function OperationsCommandCenter({
   ].slice(0, 8);
 
   return (
-    <section className="grid gap-5 border-b border-black/10 py-7 xl:grid-cols-[minmax(0,1.1fr)_0.9fr]">
-      <div className="rounded-lg border border-black/10 bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+    <section className="grid gap-6 border-b border-black/10 py-9 xl:grid-cols-[minmax(0,1.12fr)_0.88fr]">
+      <div className="rounded-2xl border border-black/10 bg-white p-7 shadow-sm shadow-black/[0.03] sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
               AI execution lifecycle
             </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-normal">
+            <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
               One execution engine for prompts, agents, workflows, benchmarks, and releases.
             </h2>
+            <p className="mt-4 max-w-2xl text-base leading-8 text-black/60">
+              Backend architecture is frozen for this release; polish work now stays in the
+              product shell, screenshots, documentation, and deployment verification.
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button className="btn-secondary" onClick={onOpenBenchmarks}>
@@ -3687,11 +3695,11 @@ function OperationsCommandCenter({
           </div>
         </div>
 
-        <div className="mt-6 grid gap-2 md:grid-cols-4">
+        <div className="mt-7 grid gap-3 md:grid-cols-4">
           {lifecycle.map(([label, count], index) => (
             <div
               key={label}
-              className="rounded-lg border border-black/10 bg-[#f7f8fb] p-3"
+              className="rounded-2xl border border-black/10 bg-[#f7f8fb] p-4"
             >
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-black/40">
                 {index + 1}. {label}
@@ -3701,7 +3709,7 @@ function OperationsCommandCenter({
           ))}
         </div>
 
-        <div className="mt-6 grid gap-3 md:grid-cols-4">
+        <div className="mt-7 grid gap-3 md:grid-cols-4">
           <CostMetric label="Spend" value={totalCost} />
           <Metric label="Avg latency" value={averageLatency} suffix="ms" />
           <Metric label="Error rate" value={errorRate} suffix="%" />
@@ -3710,13 +3718,13 @@ function OperationsCommandCenter({
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-1">
-        <div className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm shadow-black/[0.03]">
           <p className="text-sm font-semibold">Global search surface</p>
           <div className="mt-3 space-y-2">
             {searchCorpus.map((item) => (
               <div
                 key={`${item.type}-${item.label}`}
-                className="flex items-center justify-between gap-3 rounded-lg border border-black/10 px-3 py-2 text-sm"
+                className="flex items-center justify-between gap-3 rounded-xl border border-black/10 px-3 py-2 text-sm"
               >
                 <span className="truncate font-medium">{item.label}</span>
                 <span className="rounded-md bg-black/[0.05] px-2 py-1 text-xs font-semibold">
@@ -3727,7 +3735,7 @@ function OperationsCommandCenter({
           </div>
         </div>
 
-        <div className="rounded-lg border border-black/10 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm shadow-black/[0.03]">
           <p className="text-sm font-semibold">Prompt Health Score</p>
           {promptIntelligence && selectedPrompt ? (
             <div className="mt-3">
@@ -3756,11 +3764,11 @@ function OperationsCommandCenter({
           )}
         </div>
 
-        <div className="rounded-lg border border-black/10 bg-white p-5 shadow-sm md:col-span-2 xl:col-span-1">
+        <div className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm shadow-black/[0.03] md:col-span-2 xl:col-span-1">
           <p className="mb-3 text-sm font-semibold">Top performing AI runs</p>
           <div className="space-y-2">
             {topRuns.map((run) => (
-              <div key={run.id} className="grid grid-cols-[1fr_auto] gap-3 rounded-lg border border-black/10 p-3 text-sm">
+              <div key={run.id} className="grid grid-cols-[1fr_auto] gap-3 rounded-xl border border-black/10 p-3 text-sm">
                 <span className="font-medium capitalize">{run.entityType} · {run.model}</span>
                 <span className="rounded-full bg-black px-2 py-1 text-xs font-semibold text-white">
                   {run.qualityScore}
@@ -5730,8 +5738,8 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-black/10 bg-white/78 p-5 shadow-sm shadow-black/[0.03] backdrop-blur">
-      <div className="mb-5 flex items-center gap-2 text-sm font-semibold">
+    <section className="rounded-2xl border border-black/10 bg-white/82 p-5 shadow-sm shadow-black/[0.03] backdrop-blur sm:p-6">
+      <div className="mb-5 flex items-center gap-2 text-sm font-semibold text-black/85">
         <Icon size={16} aria-hidden="true" />
         {title}
       </div>
@@ -5748,7 +5756,7 @@ function StatusBadge({
   label: string;
 }) {
   return (
-    <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-black/10 bg-white px-3 text-sm font-medium text-black/70">
+    <span className="inline-flex h-10 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-black/70 shadow-sm shadow-black/[0.02]">
       <Icon size={15} aria-hidden="true" />
       {label}
     </span>
@@ -5798,8 +5806,10 @@ function CategoryButton({
   return (
     <button
       className={clsx(
-        "flex h-10 w-full items-center justify-between gap-3 rounded-lg border px-3 text-sm font-medium",
-        active ? "border-black bg-white" : "border-black/10 bg-white/70 hover:bg-white",
+        "flex h-11 w-full items-center justify-between gap-3 rounded-xl border px-3 text-sm font-medium transition",
+        active
+          ? "border-black bg-white shadow-sm"
+          : "border-black/10 bg-white/70 hover:border-black/20 hover:bg-white",
       )}
       onClick={onClick}
     >
@@ -5826,7 +5836,7 @@ function ToggleButton({
   return (
     <button
       className={clsx(
-        "flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium",
+        "flex h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium transition",
         active
           ? "border-black bg-black text-white"
           : "border-black/10 bg-white text-black/70 hover:border-black/25",
@@ -5855,7 +5865,7 @@ function IconButton({
   return (
     <button
       className={clsx(
-        "grid size-8 place-items-center rounded-md border transition",
+        "grid size-9 place-items-center rounded-xl border transition",
         active
           ? "border-black bg-black text-white"
           : "border-black/10 bg-white text-black/65 hover:border-black/30",
@@ -5881,7 +5891,7 @@ function Metric({
   suffix?: string;
 }) {
   return (
-    <div className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm shadow-black/[0.03]">
       <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-black/45">
         {label}
       </dt>
@@ -5895,7 +5905,7 @@ function Metric({
 
 function CostMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm shadow-black/[0.03]">
       <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-black/45">
         {label}
       </dt>
@@ -5908,7 +5918,7 @@ function CostMetric({ label, value }: { label: string; value: number }) {
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-black/[0.04] p-3">
+    <div className="rounded-xl bg-black/[0.04] p-3">
       <dt className="font-medium text-black/45">{label}</dt>
       <dd className="mt-1 truncate font-semibold text-black/75">{value}</dd>
     </div>
