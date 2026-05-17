@@ -2620,9 +2620,9 @@ export function PromptConsole() {
 
   return (
     <main className="min-h-screen bg-[#f5f7f9] text-[var(--foreground)]">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col px-4 py-7 sm:px-6 lg:px-10">
-        <header className="border-b border-black/10 pb-10 pt-4">
-          <div className="flex flex-col gap-10 lg:flex-row lg:items-end lg:justify-between">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col px-4 py-5 sm:px-6 lg:px-10">
+        <header className="border-b border-black/10 pb-7 pt-4">
+          <div className="flex flex-col gap-7 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-4xl">
               <div className="mb-5 flex items-center gap-3">
                 <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-black text-white shadow-lg shadow-black/10">
@@ -2640,7 +2640,7 @@ export function PromptConsole() {
               <h1 className="text-4xl font-semibold tracking-tight text-black sm:text-5xl lg:text-6xl">
                 PromptDeck AI
               </h1>
-              <p className="mt-5 max-w-3xl text-lg leading-8 text-black/60 sm:text-xl">
+              <p className="mt-4 max-w-3xl text-base leading-8 text-black/60 sm:text-lg">
                 A production-grade AI execution operating system where prompts, versions,
                 experiments, evaluations, workflows, agents, releases, and observability
                 share one execution model.
@@ -2654,15 +2654,15 @@ export function PromptConsole() {
               </div>
             </div>
 
-            <div className="grid min-w-[260px] gap-3 sm:grid-cols-2 lg:grid-cols-1">
-              <Metric label="Prompts" value={stats.prompts} />
-              <Metric label="AI runs" value={stats.aiRuns} />
-              <Metric label="Workflows" value={stats.workflows} />
-              <Metric label="Agents" value={stats.agents} />
+            <div className="grid w-full grid-cols-2 gap-3 lg:w-[360px] xl:w-[420px]">
+              <HeaderMetric label="Prompts" value={stats.prompts} />
+              <HeaderMetric label="AI runs" value={stats.aiRuns} />
+              <HeaderMetric label="Workflows" value={stats.workflows} />
+              <HeaderMetric label="Agents" value={stats.agents} />
             </div>
           </div>
 
-          <div className="mt-7 flex flex-wrap items-center gap-2">
+          <div className="mt-6 flex flex-wrap items-center gap-2">
             <button className="btn-secondary" onClick={() => setCommandOpen(true)}>
               <Command size={16} aria-hidden="true" />
               Cmd+K
@@ -2705,7 +2705,7 @@ export function PromptConsole() {
         </header>
 
         <nav
-          className="sticky top-0 z-30 -mx-4 flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-black/10 bg-[#f5f7f9]/90 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10"
+          className="sticky top-0 z-30 -mx-4 flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-black/10 bg-[#f5f7f9]/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10"
           aria-label="Primary workspace views"
         >
           {viewTabs.map(({ view, icon: TabIcon, label }) => {
@@ -5878,6 +5878,17 @@ function IconButton({
     >
       {children}
     </button>
+  );
+}
+
+function HeaderMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm shadow-black/[0.03]">
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/45">
+        {label}
+      </dt>
+      <dd className="mt-2 text-3xl font-semibold tracking-normal">{value}</dd>
+    </div>
   );
 }
 
