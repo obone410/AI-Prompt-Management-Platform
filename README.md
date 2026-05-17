@@ -14,17 +14,21 @@ Backend architecture is frozen for v3.1. The current pass focuses on product pol
 
 ## Demo
 
-![PromptDeck AI demo](docs/demos/promptops-demo.gif)
+![PromptDeck AI product tour](docs/demos/promptops-demo.gif)
 
 ## Screenshots
 
-| Dashboard | Experiments | Observability |
-| --- | --- | --- |
-| ![Dashboard](docs/screenshots/dashboard-desktop.png) | ![Experiments](docs/screenshots/experiments-desktop.png) | ![Observability](docs/screenshots/observability-desktop.png) |
+<p>
+  <img src="docs/screenshots/readme-dashboard.png" alt="PromptDeck AI command center" width="100%">
+</p>
 
-| Agents | Workflows | Releases |
-| --- | --- | --- |
-| ![Agents](docs/screenshots/agents-desktop.png) | ![Workflows](docs/screenshots/workflows-desktop.png) | ![Releases](docs/screenshots/deployments-desktop.png) |
+| Benchmarking Engine | Agent Runtime |
+| --- | --- |
+| <img src="docs/screenshots/readme-benchmarks.png" alt="Dataset-driven benchmarking and model comparison" width="100%"> | <img src="docs/screenshots/readme-agents.png" alt="Agent runtime builder with trace timeline" width="100%"> |
+
+| Observability Center | Mobile Layout |
+| --- | --- |
+| <img src="docs/screenshots/readme-observability.png" alt="LangSmith-style trace observability center" width="100%"> | <img src="docs/screenshots/readme-mobile.png" alt="Responsive PromptDeck AI mobile command center" width="48%"> |
 
 ## What It Does
 

@@ -40,6 +40,11 @@ Artifacts:
 - `docs/screenshots/dashboard-mobile.png`
 - `docs/screenshots/shared-prompt.png`
 - `docs/screenshots/live-production-security.png`
+- `docs/screenshots/readme-dashboard.png`
+- `docs/screenshots/readme-benchmarks.png`
+- `docs/screenshots/readme-agents.png`
+- `docs/screenshots/readme-observability.png`
+- `docs/screenshots/readme-mobile.png`
 - `docs/demos/promptops-demo.gif`
 
 ## Production Browser QA
