@@ -1,18 +1,36 @@
-# PromptDeck AI v3.1 — AI Execution & Observability OS
+# PromptDeck AI v3.1
 
-PromptDeck AI is a production-style LLMOps workspace for managing the full AI execution lifecycle: prompts, versions, experiments, benchmarks, agents, workflows, deployments, traces, metrics, and improvements.
+<div align="center">
+  <p><strong>AI Execution & Observability OS for PromptOps, LLMOps, benchmarking, agents, workflows, and releases.</strong></p>
+  <p>
+    <a href="https://ai-prompt-management-platform.vercel.app">Live Production</a>
+    ·
+    <a href="docs/ARCHITECTURE.md">Architecture</a>
+    ·
+    <a href="docs/SUPABASE.md">Database & RLS</a>
+    ·
+    <a href="docs/QA.md">QA Report</a>
+    ·
+    <a href="SECURITY.md">Security</a>
+  </p>
+  <p>
+    <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16.2.6-black?logo=nextdotjs">
+    <img alt="React" src="https://img.shields.io/badge/React-19.2.6-149ECA?logo=react&logoColor=white">
+    <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white">
+    <img alt="Supabase" src="https://img.shields.io/badge/Supabase-RLS-3FCF8E?logo=supabase&logoColor=white">
+    <img alt="Vercel" src="https://img.shields.io/badge/Vercel-Production-black?logo=vercel">
+  </p>
+</div>
 
-The project is built as a real SaaS console, not a landing page. It uses a unified execution backbone so every AI action becomes a run, every run creates trace data, and every output can be measured, compared, and improved.
+PromptDeck AI is a production-style SaaS console for the full AI operations lifecycle:
 
-Production: `https://ai-prompt-management-platform.vercel.app`
+```text
+Prompt -> Version -> Benchmark -> Workflow -> Agent -> Release -> Trace -> Improve
+```
 
-GitHub: `https://github.com/obone410/AI-Prompt-Management-Platform.git`
+Instead of treating prompts, experiments, agents, workflows, and observability as separate tools, PromptDeck AI connects them through one execution backbone. Every AI action can become a run, every run can produce trace data, every output can become an artifact, and every artifact can be measured for latency, cost, quality, and reliability.
 
-## Release State
-
-Backend architecture is frozen for v3.1. The current pass focuses on product polish: cleaner frontend hierarchy, better responsive behavior, refreshed screenshots, tighter documentation, and clean deployment verification.
-
-## Demo
+## Product Tour
 
 ![PromptDeck AI product tour](docs/demos/promptops-demo.gif)
 
@@ -30,17 +48,18 @@ Backend architecture is frozen for v3.1. The current pass focuses on product pol
 | --- | --- |
 | <img src="docs/screenshots/readme-observability.png" alt="LangSmith-style trace observability center" width="100%"> | <img src="docs/screenshots/readme-mobile.png" alt="Responsive PromptDeck AI mobile command center" width="48%"> |
 
-## What It Does
+## Highlights
 
-- Manages prompts with CRUD, categories, search, favorites, sharing, export, variables, and version history.
-- Tests prompts through server-side AI routes with Zod validation, auth gating, and demo-safe fallback responses.
-- Compares model outputs across GPT, Claude, and Gemini-style provider adapters.
-- Runs dataset-driven benchmarks with quality, latency, token, cost, and regression metrics.
-- Builds AI workflows with prompt, variable, condition, and output nodes.
-- Tracks agents, tool calls, memory, run history, and execution traces.
-- Deploys prompt releases across Development, Staging, and Production concepts.
-- Provides a LangSmith-style observability center for trace trees, artifacts, logs, and performance breakdowns.
-- Shows PromptOps analytics for usage, categories, cost estimates, provider efficiency, and recent activity.
+| Area | What It Includes |
+| --- | --- |
+| PromptOps | Prompt CRUD, categories, favorites, sharing, export, variables, version history, rollback, and improvement suggestions. |
+| Benchmarking | Dataset-driven evaluations, model comparisons, quality scores, regression alerts, leaderboards, latency, token, and cost metrics. |
+| Workflows | Prompt, variable, condition, and output nodes with run history, execution logs, and workflow analytics. |
+| Agents | Agent builder, tool-call abstraction, memory view, run history, reasoning timeline, and trace inspection. |
+| Releases | Development, staging, and production release concepts with rollout status, promotion, rollback, and deployment history. |
+| Observability | Unified runs, trace events, artifacts, logs, error capture, performance breakdowns, and workspace-level analytics. |
+| Collaboration | Organizations, workspaces, roles, shared libraries, team analytics, invite UI, audit logs, and activity feed foundations. |
+| Security | RLS-first Supabase schema, server-only provider calls, Zod validation, protected APIs, rate limiting, and secure env handling. |
 
 ## Architecture
 
@@ -48,44 +67,34 @@ PromptDeck AI uses one execution model across the product:
 
 ```mermaid
 flowchart LR
-  Prompt["Prompt / Workflow / Agent / Benchmark"] --> Run["ai_runs"]
+  Surface["Prompt / Workflow / Agent / Benchmark / Release"] --> Run["ai_runs"]
   Run --> Trace["trace_nodes + ai_trace_events"]
   Trace --> Artifact["ai_artifacts"]
   Artifact --> Metric["ai_metrics"]
   Metric --> Improve["Improve, deploy, or rollback"]
-  Improve --> Run
+  Improve --> Surface
 ```
 
-Key implementation points:
+Core implementation points:
 
-- `src/lib/ai-execution.ts` creates the shared run, trace, artifact, and metric payload shape.
-- API routes keep provider calls server-side.
+- `src/lib/ai-execution.ts` defines the shared run, trace, artifact, and metric payloads.
+- API routes keep OpenAI/provider calls on the server.
 - Supabase migrations define RLS-first tables for prompts, versions, runs, traces, agents, benchmarks, workflows, organizations, and releases.
-- Demo mode works without paid AI credentials, while production credentials stay in ignored env files or deployment secrets.
-
-More detail:
-
-- [Architecture](docs/ARCHITECTURE.md)
-- [Supabase schema and RLS](docs/SUPABASE.md)
-- [Security notes](SECURITY.md)
-- [QA report](docs/QA.md)
+- Demo mode works without paid AI credentials, while production credentials stay in ignored env files or Vercel secrets.
+- Upstash Redis, Sentry, PostHog, and observability hooks are represented as production-ready integration points.
 
 ## Tech Stack
 
-- Next.js App Router `16.2.6`
-- React `19.2.6`
-- TypeScript
-- Tailwind CSS
-- Supabase
-- OpenAI SDK
-- Zod
-- Upstash Redis
-- Recharts
-- Framer Motion
-- Playwright
-- Vercel
+| Layer | Tools |
+| --- | --- |
+| App | Next.js App Router `16.2.6`, React `19.2.6`, TypeScript |
+| UI | Tailwind CSS, Framer Motion, Recharts, Lucide icons |
+| Data | Supabase Auth, Postgres, RLS policies, SQL migrations |
+| AI | OpenAI SDK with server-only provider routes and demo-safe fallbacks |
+| Infra | Vercel, Upstash Redis rate limiting, Sentry/PostHog hooks |
+| Quality | ESLint, TypeScript, Playwright, npm audit |
 
-## Local Setup
+## Local Development
 
 ```bash
 npm install
@@ -94,7 +103,7 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-Create `.env.local` from `.env.example` when using real services:
+Create `.env.local` from `.env.example` when using live services:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
@@ -112,7 +121,7 @@ Real `.env*` files are ignored by Git.
 
 ## Verification
 
-Current verification suite:
+The project is checked with:
 
 ```bash
 npm run lint
@@ -122,7 +131,7 @@ npm run test:e2e
 npm audit --audit-level=moderate
 ```
 
-The Playwright test covers the demo auth flow, prompt testing, and shared prompt route. Browser QA screenshots are stored in `docs/screenshots/`.
+The Playwright test covers demo sign-in, prompt testing, benchmarking, agent execution, workflow execution, release controls, observability navigation, and the shared prompt route. Browser QA screenshots live in `docs/screenshots/`.
 
 ## Deployment
 
@@ -133,14 +142,26 @@ The Playwright test covers the demo auth flow, prompt testing, and shared prompt
 5. Add environment variables in Vercel.
 6. Deploy with `vercel deploy --prod`.
 
-## Why This Project Is Recruiter-Friendly
+Production is currently served at:
 
-PromptDeck AI demonstrates full-stack product engineering around a modern AI infrastructure problem:
+```text
+https://ai-prompt-management-platform.vercel.app
+```
 
-- LLMOps and PromptOps system design
-- Auth, RLS, CRUD, versioning, and audit trails
-- Server-only AI provider calls
-- Evaluation, benchmarking, tracing, and observability concepts
-- Workflow and agent architecture
-- Token/cost awareness and production scaling strategy
+## Why Recruiters Like This Project
+
+PromptDeck AI demonstrates more than a prompt CRUD app. It shows product and systems thinking around modern AI infrastructure:
+
+- LLMOps and PromptOps architecture
+- Auth, RLS, CRUD, versioning, audit trails, and team foundations
+- Server-only AI provider execution with secure environment handling
+- Benchmarking, evaluation, trace observability, and cost awareness
+- Workflow and agent runtime concepts
 - Clean TypeScript, Next.js, Supabase, and Vercel delivery
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Supabase schema and RLS](docs/SUPABASE.md)
+- [Security notes](SECURITY.md)
+- [QA report](docs/QA.md)
