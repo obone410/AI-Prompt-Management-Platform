@@ -2621,7 +2621,7 @@ export function PromptConsole() {
   return (
     <main className="min-h-screen bg-[#f5f7f9] text-[var(--foreground)]">
       <div className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col px-4 py-5 sm:px-6 lg:px-10">
-        <header className="border-b border-black/10 pb-7 pt-4">
+        <header className="pb-6 pt-4">
           <div className="flex flex-col gap-7 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-4xl">
               <div className="mb-5 flex items-center gap-3">
@@ -2646,11 +2646,23 @@ export function PromptConsole() {
                 share one execution model.
               </p>
               <div className="mt-6 flex flex-wrap gap-2">
-                <StatusBadge icon={ServerCog} label="Redis rate limits" />
-                <StatusBadge icon={Activity} label="PostHog/Sentry hooks" />
+                <StatusBadge
+                  className="hidden sm:inline-flex"
+                  icon={ServerCog}
+                  label="Redis rate limits"
+                />
+                <StatusBadge
+                  className="hidden lg:inline-flex"
+                  icon={Activity}
+                  label="PostHog/Sentry hooks"
+                />
                 <StatusBadge icon={ShieldCheck} label="RLS protected" />
                 <StatusBadge icon={GitBranch} label="Backend frozen" />
-                <StatusBadge icon={CircleDollarSign} label="Cost estimates" />
+                <StatusBadge
+                  className="hidden sm:inline-flex"
+                  icon={CircleDollarSign}
+                  label="Cost estimates"
+                />
               </div>
             </div>
 
@@ -2705,7 +2717,7 @@ export function PromptConsole() {
         </header>
 
         <nav
-          className="sticky top-0 z-30 -mx-4 flex flex-nowrap items-center gap-2 overflow-x-auto border-b border-black/10 bg-[#f5f7f9]/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10"
+          className="sticky top-0 z-30 grid grid-cols-2 gap-2 rounded-3xl border border-black/10 bg-white/85 p-2 shadow-sm shadow-black/[0.03] backdrop-blur sm:grid-cols-4 xl:grid-cols-8"
           aria-label="Primary workspace views"
         >
           {viewTabs.map(({ view, icon: TabIcon, label }) => {
@@ -2713,21 +2725,18 @@ export function PromptConsole() {
               <button
                 key={view}
                 className={clsx(
-                  "inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition",
+                  "inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-semibold transition",
                   activeView === view
-                    ? "border-black bg-black text-white"
-                    : "border-black/10 bg-white/70 text-black/65 hover:-translate-y-0.5 hover:bg-white",
+                    ? "border-black bg-black text-white shadow-sm shadow-black/10"
+                    : "border-transparent bg-transparent text-black/60 hover:bg-black/[0.04] hover:text-black",
                 )}
                 onClick={() => setActiveView(view)}
               >
-                <TabIcon size={15} aria-hidden="true" />
-                {label}
+                <TabIcon className="shrink-0" size={15} aria-hidden="true" />
+                <span className="truncate">{label}</span>
               </button>
             );
           })}
-          <span className="ml-auto hidden shrink-0 text-xs font-medium uppercase tracking-[0.16em] text-black/40 2xl:inline">
-            N new / E benchmarks / W workflows / A agents / O traces / Cmd+K
-          </span>
         </nav>
 
         {activeView === "operations" ? (
@@ -2888,7 +2897,7 @@ export function PromptConsole() {
                           "rounded-2xl border bg-white p-4 transition",
                           active
                             ? "border-black shadow-md shadow-black/[0.05]"
-                            : "border-black/10 hover:-translate-y-0.5 hover:border-black/25 hover:shadow-sm",
+                            : "border-black/10 hover:border-black/25 hover:bg-white/95 hover:shadow-sm",
                         )}
                       >
                         <button
@@ -3664,7 +3673,7 @@ function OperationsCommandCenter({
   ].slice(0, 8);
 
   return (
-    <section className="grid gap-6 border-b border-black/10 py-9 xl:grid-cols-[minmax(0,1.12fr)_0.88fr]">
+    <section className="grid gap-6 py-8 xl:grid-cols-[minmax(0,1.12fr)_0.88fr]">
       <div className="rounded-2xl border border-black/10 bg-white p-7 shadow-sm shadow-black/[0.03] sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
@@ -5751,12 +5760,19 @@ function Panel({
 function StatusBadge({
   icon: Icon,
   label,
+  className,
 }: {
   icon: LucideIcon;
   label: string;
+  className?: string;
 }) {
   return (
-    <span className="inline-flex h-10 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-black/70 shadow-sm shadow-black/[0.02]">
+    <span
+      className={clsx(
+        "inline-flex h-10 items-center gap-2 rounded-xl border border-black/10 bg-white px-3 text-sm font-medium text-black/70 shadow-sm shadow-black/[0.02]",
+        className,
+      )}
+    >
       <Icon size={15} aria-hidden="true" />
       {label}
     </span>
