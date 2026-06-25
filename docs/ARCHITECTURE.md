@@ -1,6 +1,6 @@
-# PromptDeck AI v3.1 — AI Execution & Observability OS Architecture
+# PromptDeck AI v3.2 — AI Execution & Observability OS Architecture
 
-PromptDeck AI v3.1 positions prompt work as a unified AI execution lifecycle: every prompt test, evaluation, experiment, workflow, agent run, benchmark, optimization, and deployment dry run becomes an `ai_run` with trace nodes, trace events, artifacts, and normalized metrics.
+PromptDeck AI v3.2 positions prompt work as a unified AI execution lifecycle: every prompt test, evaluation, experiment, workflow, agent run, benchmark, optimization, and deployment dry run becomes an `ai_run` with trace nodes, trace events, artifacts, and normalized metrics.
 
 ## Product Surface
 
@@ -151,7 +151,7 @@ flowchart LR
 - Evaluation responses include estimated input tokens, output tokens, output length, latency, quality sub-scores, and estimated cost.
 - Deployment, workflow, organization, experiment, and audit tables use RLS with owner/member access checks.
 - Unified run, trace-event, trace-node, artifact, metric, agent, benchmark, prompt-intelligence, and release tables use RLS with actor/workspace access checks.
-- Production responses set CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, and COOP.
+- Production responses set CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, COOP, CORP, and origin isolation headers.
 - New AI operations tables include RLS policies for actor/member access.
 
 ## Scaling Notes

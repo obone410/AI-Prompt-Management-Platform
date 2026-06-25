@@ -1,6 +1,6 @@
 # Supabase Setup
 
-PromptDeck AI v3.1 includes Supabase schema, indexes, triggers, RPCs, and RLS policies in `supabase/migrations`.
+PromptDeck AI v3.2 includes Supabase schema, indexes, triggers, RPCs, and RLS policies in `supabase/migrations`.
 
 ## Migration Order
 

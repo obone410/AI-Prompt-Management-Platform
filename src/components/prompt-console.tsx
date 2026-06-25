@@ -2300,7 +2300,7 @@ export function PromptConsole() {
       environment,
       status: "active",
       deployedBy: session?.email ?? "demo@promptdeck.ai",
-      metadata: `Deployed from PromptDeck AI v3.1.0 to ${environment}.`,
+      metadata: `Deployed from PromptDeck AI v3.2.0 to ${environment}.`,
       createdAt: timestamp,
     };
     const history = {
@@ -2630,10 +2630,10 @@ export function PromptConsole() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0f766e]">
-                    AI Execution OS v3.1.0
+                    AI Execution OS v3.2.0
                   </p>
                   <p className="text-sm font-semibold text-black/55">
-                    Unified execution, traces, benchmarks, agents, and releases
+                    Latest Next.js, React, Supabase, OpenAI SDK, and hardened CSP
                   </p>
                 </div>
               </div>
@@ -2656,8 +2656,8 @@ export function PromptConsole() {
                   icon={Activity}
                   label="PostHog/Sentry hooks"
                 />
-                <StatusBadge icon={ShieldCheck} label="RLS protected" />
-                <StatusBadge icon={GitBranch} label="Backend frozen" />
+                <StatusBadge icon={ShieldCheck} label="CSP + RLS hardened" />
+                <StatusBadge icon={GitBranch} label="2026 toolchain" />
                 <StatusBadge
                   className="hidden sm:inline-flex"
                   icon={CircleDollarSign}
@@ -3237,7 +3237,11 @@ export function PromptConsole() {
                         aria-label="Open share preview"
                         onClick={() => {
                           if (selectedPrompt.shareSlug) {
-                            window.open(`/share/${selectedPrompt.shareSlug}`, "_blank");
+                            window.open(
+                              `/share/${selectedPrompt.shareSlug}`,
+                              "_blank",
+                              "noopener,noreferrer",
+                            );
                           } else {
                             showToast("Enable sharing before opening a preview.");
                           }

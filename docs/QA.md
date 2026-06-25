@@ -23,10 +23,12 @@ Coverage:
 - Release Management renders Development, Staging, and Production lifecycle controls with rollout, health, rollback, and promotion actions.
 - Analytics and Team tabs render from the production build.
 - Shared prompt page renders the public prompt preview.
-- Screenshots were refreshed from a production build on 2026-05-17.
+- Screenshots were refreshed from a production build on 2026-06-25.
 - Header alignment, non-scrolling navigation, and mobile metric layout were rechecked after the frontend fit pass; mobile viewport overflow returned `0px`.
 - Animated demo GIF was generated from real browser frames.
 - Playwright e2e forces demo mode on its own port so tests do not depend on paid AI quota.
+- v3.2 local production smoke returned homepage `200`, browser console errors `0`, failed requests `0`, mobile overflow `0px`, and unauthenticated `POST /api/test-prompt` `401`.
+- v3.2 production CSP was checked locally and does not include `unsafe-eval`; Sentry, PostHog, Supabase HTTPS, and Supabase websocket endpoints are covered by `connect-src`.
 
 Artifacts:
 
@@ -55,8 +57,8 @@ Result:
 
 - Homepage returned `200`.
 - Share route returned `200`.
-- Production title returned `PromptDeck AI v3.1 — AI Execution OS`.
-- Version marker `AI Execution OS v3.1.0` rendered in the live UI.
+- Production title returned `PromptDeck AI v3.2 — AI Execution OS`.
+- Version marker `AI Execution OS v3.2.0` rendered in the live UI.
 - Browser console errors: `0`.
 - Failed network requests: `0`.
 - Unexpected 4xx/5xx page asset responses: `0`.
@@ -64,12 +66,12 @@ Result:
 - Demo sign-in rendered `Demo session` and did not create a Supabase account.
 - Operations, Benchmarks, Agents, Workflows, Releases, Observability, Analytics, and Team views opened on production.
 
-Performance spot check from the 2026-05-17 recheck:
+Performance spot check from the 2026-06-25 recheck:
 
 | Route | DOMContentLoaded | Load | FCP | Transferred |
 | --- | ---: | ---: | ---: | ---: |
-| `/` warm cache | 211 ms | 228 ms | 228 ms | 300 B |
-| `/share/product-brief` | 1106 ms | 1319 ms | 1120 ms | 3 KB |
+| `/` local production | 200 status | console errors `0` | mobile overflow `0px` | CSP `unsafe-eval=false` |
+| `/api/test-prompt` unauthenticated | 401 status | provider spend gated | rate limited | Zod validated |
 
 ## Command Verification
 
@@ -95,14 +97,14 @@ signupRequestCount=0
 
 Latest production scan:
 
-- `docs/SECURITY_AUDIT_2026-05-17.md`
+- `docs/SECURITY_AUDIT_2026-06-25.md`
 
 Summary:
 
-- Deployed HTML and 8 generated JavaScript assets were scanned.
+- Source, dependency, local production headers, and generated media assets were rechecked.
 - No OpenAI, Vercel, or Supabase service-role secrets were found in deployed assets.
 - The only deployed key-like values found were the expected public Supabase URL and publishable key.
-- Security headers are present on production responses.
+- Security headers are present and v3.2 removes production `unsafe-eval` from CSP.
 
 ## External Credential Gaps
 

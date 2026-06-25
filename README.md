@@ -1,4 +1,4 @@
-# PromptDeck AI v3.1
+# PromptDeck AI v3.2
 
 <div align="center">
   <p><strong>AI Execution & Observability OS for PromptOps, LLMOps, benchmarking, agents, workflows, and releases.</strong></p>
@@ -14,10 +14,11 @@
     <a href="SECURITY.md">Security</a>
   </p>
   <p>
-    <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16.2.6-black?logo=nextdotjs">
-    <img alt="React" src="https://img.shields.io/badge/React-19.2.6-149ECA?logo=react&logoColor=white">
+    <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16.2.9-black?logo=nextdotjs">
+    <img alt="React" src="https://img.shields.io/badge/React-19.2.7-149ECA?logo=react&logoColor=white">
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white">
-    <img alt="Supabase" src="https://img.shields.io/badge/Supabase-RLS-3FCF8E?logo=supabase&logoColor=white">
+    <img alt="Supabase" src="https://img.shields.io/badge/Supabase_JS-2.108.2-3FCF8E?logo=supabase&logoColor=white">
+    <img alt="OpenAI SDK" src="https://img.shields.io/badge/OpenAI_SDK-6.45.0-111827">
     <img alt="Vercel" src="https://img.shields.io/badge/Vercel-Production-black?logo=vercel">
   </p>
 </div>
@@ -71,7 +72,7 @@ Instead of treating prompts, experiments, agents, workflows, and observability a
 | Releases | Development, staging, and production release concepts with rollout status, promotion, rollback, and deployment history. |
 | Observability | Unified runs, trace events, artifacts, logs, error capture, performance breakdowns, and workspace-level analytics. |
 | Collaboration | Organizations, workspaces, roles, shared libraries, team analytics, invite UI, audit logs, and activity feed foundations. |
-| Security | RLS-first Supabase schema, server-only provider calls, Zod validation, protected APIs, rate limiting, and secure env handling. |
+| Security | RLS-first Supabase schema, server-only provider calls, Zod validation, protected APIs, rate limiting, hardened CSP, HSTS, and secure env handling. |
 
 ## Architecture
 
@@ -93,18 +94,19 @@ Core implementation points:
 - API routes keep OpenAI/provider calls on the server.
 - Supabase migrations define RLS-first tables for prompts, versions, runs, traces, agents, benchmarks, workflows, organizations, and releases.
 - Demo mode works without paid AI credentials, while production credentials stay in ignored env files or Vercel secrets.
+- Production headers include CSP, HSTS, COOP, CORP, nosniff, Referrer-Policy, Permissions-Policy, and origin isolation.
 - Upstash Redis, Sentry, PostHog, and observability hooks are represented as production-ready integration points.
 
 ## Tech Stack
 
 | Layer | Tools |
 | --- | --- |
-| App | Next.js App Router `16.2.6`, React `19.2.6`, TypeScript |
+| App | Next.js App Router `16.2.9`, React `19.2.7`, TypeScript |
 | UI | Tailwind CSS, Framer Motion, Recharts, Lucide icons |
-| Data | Supabase Auth, Postgres, RLS policies, SQL migrations |
-| AI | OpenAI SDK with server-only provider routes and demo-safe fallbacks |
+| Data | Supabase Auth, Postgres, RLS policies, SQL migrations, Supabase JS `2.108.2` |
+| AI | OpenAI SDK `6.45.0` with server-only provider routes and demo-safe fallbacks |
 | Infra | Vercel, Upstash Redis rate limiting, Sentry/PostHog hooks |
-| Quality | ESLint, TypeScript, Playwright, npm audit |
+| Quality | ESLint, TypeScript, Playwright `1.61.1`, npm audit |
 
 ## Local Development
 

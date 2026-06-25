@@ -11,7 +11,8 @@ PromptDeck AI keeps real credentials out of the browser and out of Git. Public S
 - Upstash Redis is used for distributed rate limiting when configured, with a local fallback for development.
 - Supabase Row Level Security protects prompts, versions, runs, traces, agents, benchmarks, workflows, deployments, organizations, workspaces, and audit data.
 - Public prompt sharing is limited to exact public slugs through `get_public_prompt_by_slug`.
-- Production responses set CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, and COOP headers.
+- Production responses set CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, COOP, CORP, X-DNS-Prefetch-Control, X-Permitted-Cross-Domain-Policies, and Origin-Agent-Cluster headers.
+- The production CSP removes `unsafe-eval`; it is only allowed during local development for React/Next.js debugging.
 
 ## Credential Rules
 
@@ -47,5 +48,6 @@ The latest local and production checks confirmed:
 - Production asset scan found no provider secrets in deployed HTML or JavaScript.
 - Public Supabase browser config is visible as expected and protected by RLS.
 - Unauthenticated live AI requests return `401`.
+- Dependency refresh upgraded Next.js, React, Supabase JS, OpenAI SDK, Tailwind, Playwright, Recharts, Framer Motion, and Lucide within compatible release lines.
 
-Detailed audit notes are in [docs/SECURITY_AUDIT_2026-05-17.md](docs/SECURITY_AUDIT_2026-05-17.md).
+Detailed audit notes are in [docs/SECURITY_AUDIT_2026-06-25.md](docs/SECURITY_AUDIT_2026-06-25.md).
