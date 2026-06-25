@@ -101,7 +101,7 @@ Latest production scan:
 
 Summary:
 
-- Source, dependency, local production headers, and generated media assets were rechecked.
+- Source, dependency, local production headers, generated media assets, deployed HTML, and `7` live JavaScript assets were rechecked.
 - No OpenAI, Vercel, or Supabase service-role secrets were found in deployed assets.
 - The only deployed key-like values found were the expected public Supabase URL and publishable key.
 - Security headers are present and v3.2 removes production `unsafe-eval` from CSP.

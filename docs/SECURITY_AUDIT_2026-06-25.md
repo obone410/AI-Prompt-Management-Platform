@@ -2,6 +2,10 @@
 
 Target: PromptDeck AI v3.2
 
+Production deployment: `dpl_35YsYMbeqU6t2kNsw9E5ARjU7nfz`
+
+Production URL: `https://ai-prompt-management-platform.vercel.app`
+
 ## Result
 
 No high or critical security issue was found in the v3.2 refresh. The app keeps live AI provider usage behind authentication, keeps provider secrets server-side, upgrades the current stable Next.js/React/Supabase/OpenAI toolchain, and hardens production response headers.
@@ -33,6 +37,22 @@ No high or critical security issue was found in the v3.2 refresh. The app keeps 
 - Production CSP includes Supabase HTTPS, Supabase websocket, PostHog, and Sentry ingest endpoints.
 - Production CSP does not include `unsafe-eval`.
 - Response headers include HSTS, CSP, X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, COOP, CORP, X-DNS-Prefetch-Control, X-Permitted-Cross-Domain-Policies, and Origin-Agent-Cluster.
+
+## Live Production Findings
+
+- Homepage status: `200`
+- Share route status: `200`
+- Production title: `PromptDeck AI v3.2 — AI Execution OS`
+- Version marker visible: `AI Execution OS v3.2.0`
+- Browser console errors: `0`
+- Failed requests: `0`
+- Mobile horizontal overflow: `0px`
+- Unauthenticated `POST /api/test-prompt`: `401`
+- CSP contains Supabase websocket and Sentry ingest endpoints.
+- CSP does not include `unsafe-eval`.
+- HSTS, CORP, and Origin-Agent-Cluster headers are present.
+- Deployed HTML plus `7` generated JavaScript assets were scanned.
+- Deployed secret-pattern matches: `0`
 
 ## Security Posture
 
