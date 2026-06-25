@@ -182,3 +182,14 @@ POSTHOG_HOST=https://app.posthog.com
 ```
 
 Only `NEXT_PUBLIC_*` values are allowed in the browser. Keep OpenAI keys, Upstash tokens, PostHog project keys, and Supabase service-role keys out of client code.
+
+## Free-Tier Heartbeat
+
+Supabase free projects can pause after a week of inactivity. The repository includes `.github/workflows/supabase-heartbeat.yml`, which sends one lightweight REST read to the `prompts` table every day.
+
+Required GitHub repository secrets:
+
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY`
+
+The heartbeat uses the public publishable key and performs a read-only request. It does not use the Supabase service-role key, does not call OpenAI, and does not insert fake user data.

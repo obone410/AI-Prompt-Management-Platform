@@ -1,0 +1,49 @@
+name: Supabase Heartbeat
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  heartbeat:
+    name: Keep Supabase project active
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+
+    steps:
+      - name: Verify Supabase heartbeat secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${SUPABASE_URL}" || -z "${SUPABASE_PUBLISHABLE_KEY}" ]]; then
+            echo "::error::Missing SUPABASE_URL or SUPABASE_PUBLISHABLE_KEY repository secret."
+            exit 1
+          fi
+
+      - name: Send lightweight database heartbeat
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          status="$(curl --silent --show-error --location \
+            --output /tmp/supabase-heartbeat.json \
+            --write-out "%{http_code}" \
+            "${SUPABASE_URL%/}/rest/v1/prompts?select=id&limit=1" \
+            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_PUBLISHABLE_KEY}" \
+            -H "Accept: application/json")"
+
+          if [[ "${status}" -lt 200 || "${status}" -ge 300 ]]; then
+            echo "::error::Supabase heartbeat failed with HTTP ${status}."
+            exit 1
+          fi
+
+          echo "Supabase heartbeat accepted with HTTP ${status}."
