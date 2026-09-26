@@ -14,7 +14,7 @@
     <a href="SECURITY.md">Security</a>
   </p>
   <p>
-    <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16.2.9-black?logo=nextdotjs">
+    <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16.3.6-black?logo=nextdotjs">
     <img alt="React" src="https://img.shields.io/badge/React-19.2.7-149ECA?logo=react&logoColor=white">
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white">
     <img alt="Supabase" src="https://img.shields.io/badge/Supabase_JS-2.108.2-3FCF8E?logo=supabase&logoColor=white">
@@ -101,7 +101,7 @@ Core implementation points:
 
 | Layer | Tools |
 | --- | --- |
-| App | Next.js App Router `16.2.9`, React `19.2.7`, TypeScript |
+| App | Next.js App Router `16.3.6`, React `19.2.7`, TypeScript |
 | UI | Tailwind CSS, Framer Motion, Recharts, Lucide icons |
 | Data | Supabase Auth, Postgres, RLS policies, SQL migrations, Supabase JS `2.108.2` |
 | AI | OpenAI SDK `6.45.0` with server-only provider routes and demo-safe fallbacks |
